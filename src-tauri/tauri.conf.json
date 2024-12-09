@@ -9,6 +9,14 @@
     "beforeBuildCommand": "pnpm build",
     "frontendDist": "../dist"
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGOTMzNTI3QUNFRjg5REQKUldUZGllK3NKeldUUDZhL0dFRER3Q2NWVm45dk9lOU9QT0dhTHVwNExHVm15STI0Um5zdDZ3VmIK%",
+      "endpoints": [
+        "https://github.com/LimTec-de/pasteAi/releases/latest/download/latest.json"
+      ]
+    }
+  },
   "app": {
     "withGlobalTauri": false,
     "windows": [
@@ -17,7 +25,7 @@
         "label": "main",
         "title": "pasteAi",
         "width": 200,
-        "height": 200,
+        "height": 150,
         "visible": false,
         "skipTaskbar": true
       }
@@ -27,6 +35,7 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "active": true,
     "targets": "all",
     "icon": [

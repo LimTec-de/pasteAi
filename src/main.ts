@@ -22,6 +22,8 @@ import clipboard from "tauri-plugin-clipboard-api";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { Webview } from '@tauri-apps/api/webview';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 
 info("Starting pasteAi");
@@ -46,6 +48,50 @@ async function initializeOpenAI() {
     console.log('OpenAI client initialized successfully');
   } catch (error) {
     console.error('Error initializing OpenAI:', error);
+  }
+}
+
+async function checkForUpdates() {
+  const update = await check();
+  if (update) {
+    console.log(
+      `found update ${update.version} from ${update.date} with notes ${update.body}`
+    );
+    let downloaded = 0;
+    let contentLength = 0;
+    // alternatively we could also call update.download() and update.install() separately
+    await update.downloadAndInstall((event) => {
+      switch (event.event) {
+        case 'Started':
+          contentLength = event.data.contentLength ?? 0;
+          if (permissionGranted) {
+            sendNotification({ title: 'pasteAi', body: 'started downloading ${event.data.contentLength} bytes' });
+          }
+          console.log(`started downloading ${event.data.contentLength} bytes`);
+          break;
+        case 'Progress':
+          downloaded += event.data.chunkLength;
+          console.log(`downloaded ${downloaded} from ${contentLength}`);
+          break;
+        case 'Finished':
+          if (permissionGranted) {
+            sendNotification({ title: 'pasteAi', body: 'download finished' });
+          }
+          console.log('download finished');
+          break;
+      }
+    });
+
+    console.log('update installed');
+    if (permissionGranted) {
+      sendNotification({ title: 'pasteAi', body: 'update installed, restarting' });
+    }
+    await relaunch();
+  } else {
+    console.log('no update found');
+    if (permissionGranted) {
+      sendNotification({ title: 'pasteAi', body: 'no update found' });
+    }
   }
 }
 
@@ -77,6 +123,20 @@ async function initializeTray() {
         text: 'OpenAI Key',
         action: () => {
           openApiKeyWindow();
+        },
+      },
+      {
+        id: 'check-for-updates',
+        text: 'Check and install updates',
+        action: () => {
+          checkForUpdates();
+        },
+      },
+      {
+        id: 'debug',
+        text: 'Show debug window',
+        action: () => {
+          Window.getCurrent().show();
         },
       },
       {
