@@ -6,9 +6,9 @@ use std::process::exit;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(target_os = "macos")]
-            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+            _app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
