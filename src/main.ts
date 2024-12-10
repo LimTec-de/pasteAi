@@ -133,48 +133,48 @@ async function initializeTray() {
     items: [
       {
         id: 'about',
-        text: 'About',
+        text: '❓ About',
         action: () => {
           openAboutWindow();
         },
       },
       {
         id: 'openai-key',
-        text: 'OpenAI Key',
+        text: '🔑 OpenAI Key',
         action: () => {
           openApiKeyWindow();
         },
       },
       {
         id: 'check-for-updates',
-        text: 'Check and install updates',
+        text: '🔄 Check and install updates',
         action: () => {
           checkForUpdates();
         },
       },
       {
         id: 'debug',
-        text: 'Show debug window',
+        text: '🐛 Show debug window',
         action: () => {
           Window.getCurrent().show();
         },
       },
       {
         id: 'autostart',
-        text: isAutoStartEnabled ? 'Disable Autostart' : 'Enable Autostart',
+        text: isAutoStartEnabled ? '🚫 Disable Autostart' : '✅ Enable Autostart',
         action: async () => {
           if (await isEnabled()) {
             await disable();
-            (await menu.get('autostart'))?.setText('Enable Autostart');
+            (await menu.get('autostart'))?.setText('✅ Enable Autostart');
           } else {
             await enable();
-            (await menu.get('autostart'))?.setText('Disable Autostart');
+            (await menu.get('autostart'))?.setText('🚫 Disable Autostart');
           }
         },
       },
       {
         id: 'quit',
-        text: 'Quit',
+        text: '🚪 Quit',
         action: () => {
           exit(0);
         },
