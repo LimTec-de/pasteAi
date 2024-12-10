@@ -1,10 +1,15 @@
 use std::process::exit;
+use tauri_plugin_autostart::MacosLauncher;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            MacosLauncher::LaunchAgent,
+            Some(vec!["--autostart"]), /* arbitrary number of args to pass to your app */
+        ))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|_app| {
             #[cfg(target_os = "macos")]

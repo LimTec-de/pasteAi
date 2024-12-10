@@ -24,6 +24,7 @@ import { Webview } from '@tauri-apps/api/webview';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
+import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 
 
 info("Starting pasteAi");
@@ -114,10 +115,29 @@ async function openApiKeyWindow() {
 
 }
 
+async function openAboutWindow() {
+  const newWindow = new WebviewWindow('about', {
+    url: '/about.html',
+    title: 'About pasteAi',
+    width: 350,
+    height: 330,
+    resizable: false,
+    alwaysOnTop: true,
+  });
+}
+
 async function initializeTray() {
   console.log("Initializing tray");
+  const isAutoStartEnabled = await isEnabled();
   const menu = await Menu.new({
     items: [
+      {
+        id: 'about',
+        text: 'About',
+        action: () => {
+          openAboutWindow();
+        },
+      },
       {
         id: 'openai-key',
         text: 'OpenAI Key',
@@ -137,6 +157,19 @@ async function initializeTray() {
         text: 'Show debug window',
         action: () => {
           Window.getCurrent().show();
+        },
+      },
+      {
+        id: 'autostart',
+        text: isAutoStartEnabled ? 'Disable Autostart' : 'Enable Autostart',
+        action: async () => {
+          if (await isEnabled()) {
+            await disable();
+            (await menu.get('autostart'))?.setText('Enable Autostart');
+          } else {
+            await enable();
+            (await menu.get('autostart'))?.setText('Disable Autostart');
+          }
         },
       },
       {
@@ -193,7 +226,7 @@ async function monitorClipboard() {
     const currentTime = Date.now();
     console.log("newText: " + newText + " - " + (currentTime - lastUpdateTime));
 
-    if (lastImprovedContent !== newText && newText === clipboardContent && currentTime - lastUpdateTime < 2000) {
+    if (lastImprovedContent !== newText && newText === clipboardContent && (currentTime - lastUpdateTime) < 2000 && (currentTime - lastUpdateTime) > 200) {
       console.log("copied the same");
 
       lastImprovedContent = await improveSentence(newText);
