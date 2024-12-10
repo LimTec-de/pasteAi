@@ -34,3 +34,6 @@ tauri-plugin-global-shortcut = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 
+[lints.rust]
+unused_variables = "allow"
+
