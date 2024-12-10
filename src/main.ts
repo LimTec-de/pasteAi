@@ -199,6 +199,7 @@ async function monitorClipboard() {
       lastImprovedContent = await improveSentence(newText);
       await clipboard.writeText(lastImprovedContent);
 
+
       if (permissionGranted) {
         sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
       }

@@ -34,7 +34,14 @@ Before building the application, ensure you have the following installed:
    pnpm tauri build
    ```
 
-The compiled application will be available in the `src-tauri/target/release` directory.
+   The compiled application will be available in the `src-tauri/target/release` directory.
+
+4. **macOS Users**: If the app is not signed, you may need to remove the quarantine attribute to run it:
+   ```bash
+   xattr -d com.apple.quarantine /Applications/pasteai.app
+   ```
+
+   This step is necessary because the app is not signed and macOS may prevent it from starting.
 
 ## Usage
 
