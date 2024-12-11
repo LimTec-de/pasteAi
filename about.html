@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>About pasteAi</title>
+    <link rel="stylesheet" href="src/styles.css">
+    <style>
+        .about-container {
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .about-container h2 {
+            margin-bottom: 1rem;
+        }
+
+        .about-container p {
+            margin: 0.5rem 0;
+        }
+
+        .github-link {
+            display: inline-block;
+            margin-top: 1rem;
+            padding: 0.5rem 1rem;
+            background-color: #24292e;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background-color 0.2s;
+        }
+
+        .github-link:hover {
+            background-color: #2f363d;
+        }
+    </style>
+    <script type="module">
+        import { getVersion } from '@tauri-apps/api/app';
+
+        async function init() {
+            const version = await getVersion();
+            document.getElementById('version').textContent = `Version: ${version}`;
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</head>
+
+<body>
+    <div class="about-container">
+        <h2>pasteAi</h2>
+        <p id="version">Loading version...</p>
+        <p>An AI-powered clipboard enhancement tool</p>
+        <a href="https://github.com/LimTec-de/pasteAi" class="github-link" target="_blank">
+            View on GitHub
+        </a>
+    </div>
+</body>
+
+</html>

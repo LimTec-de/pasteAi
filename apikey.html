@@ -2,7 +2,8 @@
 <html>
 
 <head>
-    <title>OpenAI API Key Configuration</title>
+    <meta charset="UTF-8">
+    <title>Settings</title>
     <style>
         body {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -11,7 +12,7 @@
         }
 
         .container {
-            max-width: 400px;
+            max-width: 600px;
             margin: 0 auto;
             background: white;
             padding: 20px;
@@ -35,12 +36,18 @@
             color: #555;
         }
 
-        input[type="text"] {
+        input[type="text"],
+        textarea {
             width: 100%;
             padding: 8px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
         }
 
         button {
@@ -60,17 +67,29 @@
             margin-top: 10px;
             color: #666;
         }
+
+        .info-text {
+            font-size: 0.85em;
+            color: #666;
+            margin-top: 4px;
+            font-style: italic;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
-        <h1>OpenAI API Key Configuration</h1>
+        <h1>⚙️ Settings</h1>
         <div class="input-group">
-            <label for="apiKey">API Key:</label>
+            <label for="apiKey">🔑 API Key:</label>
             <input type="text" id="apiKey" placeholder="Enter your OpenAI API key">
         </div>
-        <button id="saveButton">Save</button>
+        <div class="input-group">
+            <label for="systemPrompt">💬 System Prompt:</label>
+            <textarea id="systemPrompt" placeholder="Enter your system prompt"></textarea>
+            <div class="info-text">Leave empty for default prompt</div>
+        </div>
+        <button id="saveButton">💾 Save</button>
     </div>
     <script type="module" src="/src/apikey.ts"></script>
 </body>
