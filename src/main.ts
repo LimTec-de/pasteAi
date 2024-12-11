@@ -234,6 +234,7 @@ async function improveSentence(msg: string): Promise<string> {
 let clipboardContent = "";
 let lastUpdateTime = 0;
 let lastImprovedContent = "";
+let lastNotImprovedContent = "";
 
 async function monitorClipboard() {
   unlistenTextUpdate = await onTextUpdate(async (newText) => {
@@ -243,15 +244,26 @@ async function monitorClipboard() {
     if (lastImprovedContent !== newText && newText === clipboardContent && (currentTime - lastUpdateTime) < 2000 && (currentTime - lastUpdateTime) > 200) {
       console.log("copied the same");
 
-      lastImprovedContent = await improveSentence(newText);
-      await clipboard.writeText(lastImprovedContent);
+      if (lastNotImprovedContent == newText) {
+        console.log("same text, not improving setting to last improved");
+        await clipboard.writeText(lastImprovedContent);
+        return;
+      } else {
+
+        lastNotImprovedContent = newText;
+
+        lastImprovedContent = await improveSentence(newText);
+        await clipboard.writeText(lastImprovedContent);
 
 
-      if (permissionGranted) {
-        sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
+        if (permissionGranted) {
+          sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
+        } else {
+          console.log("no permission granted for notification");
+        }
+
+        console.log("improvedContent: " + lastImprovedContent);
       }
-
-      console.log("improvedContent: " + lastImprovedContent);
 
     }
 
