@@ -1,6 +1,7 @@
-# Clipboard Text Optimizer
+# Ai Clipboard Text Optimizer
 
 A desktop application that automatically optimizes text when you perform two clipboard cuts within a 1-second interval.
+Select and cut text (Ctrl+X or ⌘+X) and then cut again within 1 second.
 
 ## Features
 
@@ -20,8 +21,8 @@ Before building the application, ensure you have the following installed:
 
 1. Clone the repository:
    ```bash
-   git clone [your-repository-url]
-   cd [repository-name]
+   git clone git@github.com:LimTec-de/pasteAi.git
+   cd pasteAi
    ```
 
 2. Install dependencies:
@@ -36,12 +37,12 @@ Before building the application, ensure you have the following installed:
 
    The compiled application will be available in the `src-tauri/target/release` directory.
 
-4. **macOS Users**: If the app is not signed, you may need to remove the quarantine attribute to run it:
+4. **macOS Users**: Remove the quarantine attribute to run it:
    ```bash
    xattr -d com.apple.quarantine /Applications/pasteai.app
    ```
 
-   This step is necessary because the app is not signed and macOS may prevent it from starting.
+   This step is necessary because the app is not signed (right now) and macOS may prevent it from starting.
 
 ## Usage
 
