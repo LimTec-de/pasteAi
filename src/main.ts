@@ -226,7 +226,7 @@ async function improveSentence(msg: string): Promise<string> {
 
     return completion.choices[0].message.content || msg;
   } catch (error) {
-    return "Could not improve sentence.";
+    return "Could not improve sentence. Did you set your OpenAI API key in the settings?";
   }
 }
 
