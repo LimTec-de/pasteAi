@@ -10,7 +10,7 @@ So basically you can use this app to make your text more readable by 2 times cut
 💾 [Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
 
 ⚠️You need an OpenAI API key to use this app. You can get one [here](https://platform.openai.com/api-keys).
-Open Settings and paste your key then restart the app.
+Then open pasteAi settings via Tray Menu and paste your key then restart the app.
 
 ## Features
 
