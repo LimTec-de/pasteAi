@@ -8,7 +8,7 @@ use tauri_plugin_store::StoreExt;
 
 #[tauri::command]
 fn get_system_prompt_from_settings(app: AppHandle) -> String {
-    let default_prompt = "You are a grammar and language corrector, you will write better sentences. You will not change the language of the sentence, only make it better. You do not answer any questions.";
+    let default_prompt = "Act as a grammar and language corrector. Improve the sentences without changing the language. Keep it casual and natural, as if written by a human. Do not answer any questions.";
     let store = app.store("store.json").expect("Failed to access store");
 
     let system_prompt = store.get("system_prompt").unwrap_or(json!(""));

@@ -4,7 +4,7 @@ import { load } from '@tauri-apps/plugin-store';
 import { Window } from '@tauri-apps/api/window';
 import OpenAI from 'openai';
 import { exit } from '@tauri-apps/plugin-process';
-import { message } from '@tauri-apps/plugin-dialog';
+import { message, confirm } from '@tauri-apps/plugin-dialog';
 import { info } from '@tauri-apps/plugin-log';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
 import {
@@ -53,6 +53,19 @@ async function initializeOpenAI() {
   }
 }
 
+async function checkForUpdatesTimer() {
+  const update = await check();
+  if (update) {
+    const confirmation = await confirm(
+      'Found update, do you want to install it?',
+      { title: 'pasteAi', kind: 'info' }
+    );
+    if (confirmation) {
+      await checkForUpdates();
+    }
+  }
+}
+
 async function checkForUpdates() {
   const update = await check();
   if (update) {
@@ -67,9 +80,9 @@ async function checkForUpdates() {
         case 'Started':
           contentLength = event.data.contentLength ?? 0;
           if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'started downloading ${event.data.contentLength} bytes' });
+            sendNotification({ title: 'pasteAi', body: 'Started downloading' });
           }
-          console.log(`started downloading ${event.data.contentLength} bytes`);
+          console.log(`started downloading `);
           break;
         case 'Progress':
           downloaded += event.data.chunkLength;
@@ -77,7 +90,7 @@ async function checkForUpdates() {
           break;
         case 'Finished':
           if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'download finished' });
+            sendNotification({ title: 'pasteAi', body: 'Download finished' });
           }
           console.log('download finished');
           break;
@@ -86,7 +99,7 @@ async function checkForUpdates() {
 
     console.log('update installed');
     if (permissionGranted) {
-      sendNotification({ title: 'pasteAi', body: 'update installed, restarting' });
+      sendNotification({ title: 'pasteAi', body: 'Update installed, restarting' });
     }
     await relaunch();
   } else {
@@ -276,6 +289,8 @@ async function main() {
   await initializeTray();
   await initializeOpenAI();
   await monitorClipboard();
+
+  setInterval(checkForUpdatesTimer, 1000 * 60 * 60 * 1);
 
 }
 
