@@ -52,7 +52,7 @@ async function initializeUI() {
 
             await invoke('set_system_prompt_from_settings', { prompt: systemPrompt });
 
-            await (await Window.getByLabel('api-key'))?.close();
+            await (await Window.getByLabel('settings'))?.close();
 
         } catch (error) {
             console.error('Error saving settings:', error);

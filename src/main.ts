@@ -98,8 +98,8 @@ async function checkForUpdates() {
 }
 
 async function openSettingsKeyWindow() {
-  const newWindow = new WebviewWindow('api-key', {
-    url: '/apikey.html',
+  const newWindow = new WebviewWindow('settings', {
+    url: '/settings.html',
     title: 'Settings',
     width: 450,
     height: 470,

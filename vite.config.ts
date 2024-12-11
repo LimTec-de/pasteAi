@@ -31,7 +31,8 @@ export default defineConfig(async () => ({
     rollupOptions: {
       input: {
         main: './index.html',
-        apikey: './apikey.html'
+        settings: './settings.html',
+        about: './about.html'
       }
     }
   }
