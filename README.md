@@ -7,6 +7,8 @@ Select and cut text (Ctrl+X or ⌘+X) and then cut again within 1 second.
 
 [Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
 
+You need an OpenAI API key to use this app. You can get one [here](https://platform.openai.com/api-keys).
+
 ## Features
 
 - Automatically detects double-cut clipboard operations
