@@ -7,7 +7,7 @@ Select and cut text (Ctrl+X or ⌘+X) and then cut again within 1 second.
 
 [Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
 
-You need an OpenAI API key to use this app. You can get one [here](https://platform.openai.com/api-keys).
+⚠️You need an OpenAI API key to use this app. You can get one [here](https://platform.openai.com/api-keys).
 Open Settings and paste your key then restart the app.
 
 ## Features
@@ -44,7 +44,7 @@ Before building the application, ensure you have the following installed:
 
    The compiled application will be available in the `src-tauri/target/release` directory.
 
-4. **macOS Users**: Remove the quarantine attribute to run it:
+4. ⚠️ **macOS Users**: Remove the quarantine attribute to run it:
    ```bash
    xattr -d com.apple.quarantine /Applications/pasteai.app
    ```
