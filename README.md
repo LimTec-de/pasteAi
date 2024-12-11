@@ -3,6 +3,10 @@
 A desktop application that automatically optimizes text when you perform two clipboard cuts within a 1-second interval.
 Select and cut text (Ctrl+X or ⌘+X) and then cut again within 1 second.
 
+## Download
+
+[Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
+
 ## Features
 
 - Automatically detects double-cut clipboard operations
