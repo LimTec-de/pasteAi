@@ -32,6 +32,7 @@ let permissionGranted = false;
 let unlistenTextUpdate: UnlistenFn;
 let unlistenClipboard: () => Promise<void>;
 let monitorRunning = false;
+let autoUpdateDialogOpen = false;
 
 
 async function initializeOpenAI() {
@@ -54,15 +55,21 @@ async function initializeOpenAI() {
 }
 
 async function checkForUpdatesTimer() {
-  const update = await check();
-  if (update) {
-    const confirmation = await confirm(
-      'Found update, do you want to install it?',
-      { title: 'pasteAi', kind: 'info' }
-    );
-    if (confirmation) {
-      await checkForUpdates();
+  if (!autoUpdateDialogOpen) {
+    const update = await check();
+    if (update) {
+      autoUpdateDialogOpen = true;
+      const confirmation = await confirm(
+        'Found update, do you want to install it?',
+        { title: 'pasteAi', kind: 'info' }
+      );
+      autoUpdateDialogOpen = false;
+      if (confirmation) {
+        await checkForUpdates();
+      }
     }
+  } else {
+    console.log("autoUpdateDialogOpen is true, not checking for updates");
   }
 }
 
