@@ -25,9 +25,7 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
-
-
-info("Starting pasteAi");
+import { invoke } from '@tauri-apps/api/core';
 
 let openai: OpenAI;
 let permissionGranted = false;
@@ -35,10 +33,13 @@ let unlistenTextUpdate: UnlistenFn;
 let unlistenClipboard: () => Promise<void>;
 let monitorRunning = false;
 
+
 async function initializeOpenAI() {
   console.log('initializeOpenAI');
 
   const store = await load('store.json', { autoSave: false });
+
+
   const openai_api_key: string = await store.get('openai_api_key') as string;
 
   try {
@@ -96,12 +97,12 @@ async function checkForUpdates() {
   }
 }
 
-async function openApiKeyWindow() {
+async function openSettingsKeyWindow() {
   const newWindow = new WebviewWindow('api-key', {
     url: '/apikey.html',
     title: 'Settings',
     width: 450,
-    height: 270,
+    height: 470,
     resizable: false,
     alwaysOnTop: true,
   });
@@ -140,9 +141,9 @@ async function initializeTray() {
       },
       {
         id: 'openai-key',
-        text: '🔑 OpenAI Key',
+        text: '🔑 Settings',
         action: () => {
-          openApiKeyWindow();
+          openSettingsKeyWindow();
         },
       },
       {
@@ -200,7 +201,7 @@ async function improveSentence(msg: string): Promise<string> {
       messages: [
         {
           role: "system",
-          content: "You are a grammar and language corrector, you will write better sentences. You will not change the language of the sentence, only make it better. You do not answer any questions."
+          content: await invoke("get_system_prompt_from_settings")
         },
         {
           role: "user",
