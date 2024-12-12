@@ -220,23 +220,7 @@ async function initializeTray() {
 async function improveSentence(msg: string): Promise<string> {
   const llmType = await store.get('llm_type') as string;
   const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
-  if (llmType === 'openai') {
-    const completion = await openai.chat.completions.create({
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: msg
-        }
-      ],
-      model: "gpt-4o-mini",
-    });
-
-    return completion.choices[0].message.content || msg;
-  } else {
+  if (llmType === 'ollama') {
     console.log("ollama improve sentence");
     const ollamaUrl = await store.get('ollama_url') as string;
     const ollama_model = await store.get('ollama_model') as string;
@@ -246,7 +230,6 @@ async function improveSentence(msg: string): Promise<string> {
       prompt: systemPrompt + "\n" + msg,
       stream: false
     }));*/
-
 
     const response = await fetch(`${ollamaUrl}/api/generate`, {
       method: 'POST',
@@ -269,6 +252,23 @@ async function improveSentence(msg: string): Promise<string> {
 
     return data.response || msg;
     //return msg;
+  } else {
+
+    const completion = await openai.chat.completions.create({
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: msg
+        }
+      ],
+      model: "gpt-4o-mini",
+    });
+
+    return completion.choices[0].message.content || msg;
   }
 }
 
