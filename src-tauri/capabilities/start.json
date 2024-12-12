@@ -1,0 +1,14 @@
+{
+    "$schema": "../gen/schemas/desktop-schema.json",
+    "identifier": "start",
+    "description": "Capability for the default window",
+    "windows": [
+        "start"
+    ],
+    "permissions": [
+        "core:default",
+        "shell:allow-open",
+        "core:window:allow-close",
+        "store:default"
+    ]
+}

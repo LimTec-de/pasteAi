@@ -34,19 +34,10 @@ pub fn run() {
             Some(vec!["--autostart"]), /* arbitrary number of args to pass to your app */
         ))
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .setup(|_app| {
-            #[cfg(target_os = "macos")]
-            _app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            Ok(())
-        })
         .setup(|app| {
-            // Create a new store or load the existing one
-            // this also put the store in the app's resource table
-            // so your following calls `store` calls (from both rust and js)
-            // will reuse the same store
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             let store = app.store("store.json")?;
-            //todo -> store.close_resource();
-
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())

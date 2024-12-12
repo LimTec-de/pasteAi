@@ -32,7 +32,8 @@ export default defineConfig(async () => ({
       input: {
         main: './index.html',
         settings: './settings.html',
-        about: './about.html'
+        about: './about.html',
+        start: './start.html'
       }
     }
   }

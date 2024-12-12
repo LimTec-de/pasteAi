@@ -24,8 +24,8 @@
         "devtools": true,
         "label": "main",
         "title": "pasteAi",
-        "width": 200,
-        "height": 150,
+        "width": 50,
+        "height": 50,
         "visible": false,
         "skipTaskbar": true
       }

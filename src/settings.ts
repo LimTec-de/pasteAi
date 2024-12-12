@@ -1,6 +1,7 @@
 import { load } from '@tauri-apps/plugin-store';
 import { Window } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 
 async function initializeUI() {
     console.info('Initializing API Key page');
@@ -49,6 +50,9 @@ async function initializeUI() {
             const store = await load('store.json', { autoSave: false });
             await store.set('openai_api_key', apiKey);
             await store.save();
+
+
+            await emit('settings-saved', { saved: true });
 
             await invoke('set_system_prompt_from_settings', { prompt: systemPrompt });
 

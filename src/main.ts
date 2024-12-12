@@ -26,6 +26,7 @@ import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 
 let openai: OpenAI;
 let permissionGranted = false;
@@ -34,11 +35,11 @@ let unlistenClipboard: () => Promise<void>;
 let monitorRunning = false;
 let autoUpdateDialogOpen = false;
 
+let store: Awaited<ReturnType<typeof load>>;
 
 async function initializeOpenAI() {
   console.log('initializeOpenAI');
 
-  const store = await load('store.json', { autoSave: false });
 
 
   const openai_api_key: string = await store.get('openai_api_key') as string;
@@ -117,7 +118,7 @@ async function checkForUpdates() {
   }
 }
 
-async function openSettingsKeyWindow() {
+async function openSettingsWindow() {
   const newWindow = new WebviewWindow('settings', {
     url: '/settings.html',
     title: 'Settings',
@@ -163,7 +164,7 @@ async function initializeTray() {
         id: 'openai-key',
         text: '🔑 Settings',
         action: () => {
-          openSettingsKeyWindow();
+          openSettingsWindow();
         },
       },
       {
@@ -171,13 +172,6 @@ async function initializeTray() {
         text: '🔄 Check and install updates',
         action: () => {
           checkForUpdates();
-        },
-      },
-      {
-        id: 'debug',
-        text: '🐛 Show debug window',
-        action: () => {
-          Window.getCurrent().show();
         },
       },
       {
@@ -294,9 +288,11 @@ listenToMonitorStatusUpdate((running) => {
 });
 */
 
+
 async function main() {
   info("Main function called");
   // Do you have permission to send a notification?
+  store = await load('store.json', { autoSave: false });
   permissionGranted = await isPermissionGranted();
 
   // If not we need to request it
@@ -304,13 +300,39 @@ async function main() {
     const permission = await requestPermission();
     permissionGranted = permission === 'granted';
   }
+  await listen<{ loggedIn: boolean, token: string }>('settings-saved', async (event) => {
+    console.log('Settings saved:', event.payload);
+    await initializeOpenAI();
+  });
+
+  await listen<{ loggedIn: boolean, token: string }>('open-settings-window', async (event) => {
+    console.log('Settings saved:', event.payload);
+    await openSettingsWindow();
+  });
+
 
   await initializeTray();
   await initializeOpenAI();
   await monitorClipboard();
 
-  setInterval(checkForUpdatesTimer, 1000 * 60 * 60 * 1);
+  if ((await store.get('show_start')) != false) {
+    await openStartWindow();
+  }
 
+
+  setInterval(checkForUpdatesTimer, 1000 * 60 * 60 * 1);
+}
+
+
+async function openStartWindow() {
+  const newWindow = new WebviewWindow('start', {
+    url: '/start.html',
+    title: 'pasteAi',
+    width: 700,
+    height: 900,
+    resizable: false,
+    alwaysOnTop: true,
+  });
 }
 
 window.addEventListener("DOMContentLoaded", async () => {
