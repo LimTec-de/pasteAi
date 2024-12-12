@@ -38,20 +38,21 @@ let autoUpdateDialogOpen = false;
 let store: Awaited<ReturnType<typeof load>>;
 
 async function initializeOpenAI() {
-  console.log('initializeOpenAI');
+  const llmType = await store.get('llm_type') as string;
+  if (llmType === 'openai') {
+    console.log('initializeOpenAI');
 
+    const openai_api_key: string = await store.get('openai_api_key') as string;
 
-
-  const openai_api_key: string = await store.get('openai_api_key') as string;
-
-  try {
-    openai = new OpenAI({
-      apiKey: openai_api_key,
-      dangerouslyAllowBrowser: true
-    });
-    console.log('OpenAI client initialized successfully');
-  } catch (error) {
-    console.error('Error initializing OpenAI:', error);
+    try {
+      openai = new OpenAI({
+        apiKey: openai_api_key,
+        dangerouslyAllowBrowser: true
+      });
+      console.log('OpenAI client initialized successfully');
+    } catch (error) {
+      console.error('Error initializing OpenAI:', error);
+    }
   }
 }
 
@@ -188,6 +189,13 @@ async function initializeTray() {
         },
       },
       {
+        id: 'debug',
+        text: '🐛 Show debug window',
+        action: () => {
+          Window.getCurrent().show();
+        },
+      },
+      {
         id: 'quit',
         text: '🚪 Quit',
         action: () => {
@@ -210,12 +218,14 @@ async function initializeTray() {
 
 
 async function improveSentence(msg: string): Promise<string> {
-  try {
+  const llmType = await store.get('llm_type') as string;
+  const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
+  if (llmType === 'openai') {
     const completion = await openai.chat.completions.create({
       messages: [
         {
           role: "system",
-          content: await invoke("get_system_prompt_from_settings")
+          content: systemPrompt
         },
         {
           role: "user",
@@ -226,8 +236,39 @@ async function improveSentence(msg: string): Promise<string> {
     });
 
     return completion.choices[0].message.content || msg;
-  } catch (error) {
-    return "Could not improve sentence. Did you set your OpenAI API key in the settings?";
+  } else {
+    console.log("ollama improve sentence");
+    const ollamaUrl = await store.get('ollama_url') as string;
+    const ollama_model = await store.get('ollama_model') as string;
+
+    console.log("ollama: " + JSON.stringify({
+      model: ollama_model,
+      prompt: systemPrompt + "\n" + msg,
+      stream: false
+    }));
+
+
+    const response = await fetch(`${ollamaUrl}/api/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: ollama_model,
+        system: systemPrompt,
+        prompt: msg,
+        stream: false
+      }),
+    });
+
+    //"This is a test. Hello ho ar you!=?"
+
+    const data = await response.json();
+
+    console.log("ollama response: " + JSON.stringify(data));
+
+    return data.response || msg;
+    //return msg;
   }
 }
 
@@ -253,17 +294,28 @@ async function monitorClipboard() {
 
         lastNotImprovedContent = newText;
 
-        lastImprovedContent = await improveSentence(newText);
-        await clipboard.writeText(lastImprovedContent);
+        try {
+          if (permissionGranted) {
+            sendNotification({ title: 'pasteAi', body: 'Starting to improve sentence' });
+          }
 
+          lastImprovedContent = await improveSentence(newText);
+          await clipboard.writeText(lastImprovedContent);
 
-        if (permissionGranted) {
-          sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
-        } else {
-          console.log("no permission granted for notification");
+          if (permissionGranted) {
+            sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
+          } else {
+            console.log("no permission granted for notification");
+          }
+          console.log("improvedContent: " + lastImprovedContent);
+        } catch (error) {
+          console.error("Error improving sentence:", error);
+          if (permissionGranted) {
+            sendNotification({ title: 'pasteAi', body: 'Could not improve sentence, please check your settings' });
+          }
         }
 
-        console.log("improvedContent: " + lastImprovedContent);
+
       }
 
     }
