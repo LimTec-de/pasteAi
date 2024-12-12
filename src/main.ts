@@ -122,8 +122,8 @@ async function openSettingsWindow() {
   const newWindow = new WebviewWindow('settings', {
     url: '/settings.html',
     title: 'Settings',
-    width: 450,
-    height: 470,
+    width: 550,
+    height: 800,
     resizable: false,
     alwaysOnTop: true,
   });
