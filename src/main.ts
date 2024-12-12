@@ -241,11 +241,11 @@ async function improveSentence(msg: string): Promise<string> {
     const ollamaUrl = await store.get('ollama_url') as string;
     const ollama_model = await store.get('ollama_model') as string;
 
-    console.log("ollama: " + JSON.stringify({
+    /*console.log("ollama: " + JSON.stringify({
       model: ollama_model,
       prompt: systemPrompt + "\n" + msg,
       stream: false
-    }));
+    }));*/
 
 
     const response = await fetch(`${ollamaUrl}/api/generate`, {
@@ -265,7 +265,7 @@ async function improveSentence(msg: string): Promise<string> {
 
     const data = await response.json();
 
-    console.log("ollama response: " + JSON.stringify(data));
+    //console.log("ollama response: " + JSON.stringify(data));
 
     return data.response || msg;
     //return msg;
