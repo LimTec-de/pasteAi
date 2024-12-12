@@ -67,3 +67,9 @@ Before building the application, ensure you have the following installed:
 To run the application in development mode:
 ```bash
 pnpm tauri dev
+```
+
+## Imprint (Impressum)
+
+For legal information and contact details, please visit our [Imprint page](https://www.limtec.de/#imprint).
+</rewritten_file>
