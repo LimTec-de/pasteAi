@@ -1,9 +1,9 @@
 # Ai Clipboard Text Optimizer
 
-A desktop application that automatically optimizes text when you perform two clipboard cuts within a 1-second interval.
-Select and cut text (Ctrl+X or ⌘+X) and then cut again within 1 second. The improved text will be copied to your clipboard.
+A desktop application that automatically optimizes text when you perform two clipboard copies within a 1-second interval.
+Select and copy text (Ctrl+C or ⌘+C) and then copy again within 1 second. The improved text will be copied to your clipboard.
 
-So basically you can use this app to make your text more readable by 2 times cutting and pasting.
+So basically you can use this app to make your text more readable by 2 times copying and pasting.
 
 ## Download
 
@@ -14,7 +14,7 @@ Then open pasteAi settings via Tray Menu and paste your key then restart the app
 
 ## Features
 
-- Automatically detects double-cut clipboard operations
+- Automatically detects double-copy clipboard operations
 - Optimizes text formatting instantly
 - Runs silently in the background
 - Cross-platform support
@@ -58,8 +58,8 @@ Before building the application, ensure you have the following installed:
 1. Launch the application
 2. The app will run in the background
 3. To optimize text:
-   - Select and cut text (Ctrl+X or ⌘+X)
-   - Immediately cut again within 1 second
+   - Select and copy text (Ctrl+C or ⌘+C)
+   - Immediately copy again within 1 second
    - The text in your clipboard will be automatically optimized
 
 ## Development
