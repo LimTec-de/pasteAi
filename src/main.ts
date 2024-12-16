@@ -7,6 +7,7 @@ import { exit } from '@tauri-apps/plugin-process';
 import { message, confirm, ask } from '@tauri-apps/plugin-dialog';
 import { info } from '@tauri-apps/plugin-log';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
+import { registerActionTypes } from '@tauri-apps/plugin-notification';
 import {
   isPermissionGranted,
   requestPermission,
@@ -123,10 +124,10 @@ async function initializeTray() {
         },
       },
       {
-        id: 'check-for-updates',
-        text: '🔄 Check for Updates',
+        id: 'debug',
+        text: '🐛 Show debug window',
         action: () => {
-          checkForAppUpdates();
+          Window.getCurrent().show();
         },
       },
       {
