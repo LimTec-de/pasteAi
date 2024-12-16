@@ -123,6 +123,13 @@ async function initializeTray() {
         },
       },
       {
+        id: 'check-for-updates',
+        text: '🔄 Check for Updates',
+        action: () => {
+          checkForAppUpdates();
+        },
+      },
+      {
         id: 'autostart',
         text: isAutoStartEnabled ? '🚫 Disable Autostart' : '✅ Enable Autostart',
         action: async () => {
@@ -150,13 +157,6 @@ async function initializeTray() {
     menu,
     menuOnLeftClick: true,
     icon: await defaultWindowIcon() ?? '',
-    action: (event) => {
-      switch (event.type) {
-        case 'DoubleClick':
-          Window.getCurrent().show();
-          break;
-      }
-    },
   };
 
   await TrayIcon.new(options);
