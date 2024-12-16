@@ -224,57 +224,62 @@ let lastUpdateTime = 0;
 let lastImprovedContent = "";
 let lastNotImprovedContent = "";
 
+let copyedSameTextXTimes = 0;
+
 async function monitorClipboard() {
   unlistenTextUpdate = await onTextUpdate(async (newText) => {
     const currentTime = Date.now();
-    console.log("newText: " + newText + " - " + (currentTime - lastUpdateTime));
+    console.log("newText (" + copyedSameTextXTimes + "x) " + (currentTime - lastUpdateTime) + "ms");
 
-    if (newText !== lastImprovedContent) {
-      console.log("newText !== clipboardContent");
+    if (newText === lastNotImprovedContent && newText != clipboardContent) {
+      console.log("newText === lastNotImprovedContent do nothing but write lastImprovedContent to clipboard");
+      await clipboard.writeText(lastImprovedContent);
+      return;
     }
-    if (newText === clipboardContent) {
-      console.log("newText === clipboardContent");
+
+    if (newText === clipboardContent && (currentTime - lastUpdateTime) < 800 && (currentTime - lastUpdateTime) > 100) {
+      copyedSameTextXTimes++;
+      console.log("copyedSameTextXTimes++");
+    } else {
+      copyedSameTextXTimes = 1;
     }
 
-    if (newText !== lastImprovedContent && newText === clipboardContent && (currentTime - lastUpdateTime) < 800 && (currentTime - lastUpdateTime) > 100) {
-      console.log("copied the same");
+    lastUpdateTime = currentTime;
+    clipboardContent = newText;
 
-      if (lastNotImprovedContent == newText) {
-        console.log("same text, not improving setting to last improved");
-        await clipboard.writeText(lastImprovedContent);
-        return;
-      } else {
+    if (copyedSameTextXTimes >= 3) {
+      console.log("copied the same text " + copyedSameTextXTimes + " times");
 
-        lastNotImprovedContent = newText;
+      lastNotImprovedContent = newText;
 
-        try {
-          if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'Starting to improve sentence' });
-          }
-
-          lastImprovedContent = await improveSentence(newText);
-          await clipboard.writeText(lastImprovedContent);
-
-          if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
-          } else {
-            console.log("no permission granted for notification");
-          }
-          console.log("improvedContent: " + lastImprovedContent);
-        } catch (error) {
-          console.error("Error improving sentence:", error);
-          if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'Could not improve sentence, please check your settings' });
-          }
+      try {
+        if (permissionGranted) {
+          sendNotification({ title: 'pasteAi', body: 'Starting to improve sentence' });
         }
 
+        console.log("starting to improve sentence");
+        lastImprovedContent = await improveSentence(newText);
+        await clipboard.writeText(lastImprovedContent);
+        console.log("done to improve sentence");
 
+        if (permissionGranted) {
+          sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
+        } else {
+          console.log("no permission granted for notification");
+        }
+        console.log("improvedContent: ------------------------------>" + lastImprovedContent);
+      } catch (error) {
+        console.error("Error improving sentence:", error);
+        if (permissionGranted) {
+          sendNotification({ title: 'pasteAi', body: 'Could not improve sentence, please check your settings' });
+        }
       }
+
+
 
     }
 
-    clipboardContent = newText;
-    lastUpdateTime = currentTime;
+
   });
 
   unlistenClipboard = await startListening();
