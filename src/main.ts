@@ -97,8 +97,8 @@ async function openAboutWindow() {
   const newWindow = new WebviewWindow('about', {
     url: '/about.html',
     title: 'About pasteAi',
-    width: 300,
-    height: 400,
+    width: 400,
+    height: 650,
     resizable: false,
     alwaysOnTop: true,
   });
@@ -253,7 +253,7 @@ async function monitorClipboard() {
     lastUpdateTime = currentTime;
     clipboardContent = newText;
 
-    if (copyedSameTextXTimes >= 3 && newText != lastNotImprovedContent) {
+    if (copyedSameTextXTimes >= 2 && newText != lastNotImprovedContent) {
       console.log("copied the same text " + copyedSameTextXTimes + " times");
 
       lastNotImprovedContent = newText;

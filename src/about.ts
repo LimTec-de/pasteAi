@@ -14,9 +14,6 @@ async function initializeUI() {
     const checkingUpdates = document.getElementById('checkingUpdates');
     const installUpdate = document.getElementById('installUpdate') as HTMLButtonElement;
 
-    if (installUpdate) {
-        installUpdate.style.display = 'none';
-    }
 
     try {
         const update = await check();
