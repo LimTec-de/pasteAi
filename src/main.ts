@@ -63,7 +63,7 @@ async function checkForAppUpdates() {
     const update = await check();
     if (update) {
       if (permissionGranted) {
-        sendNotification({ title: 'pasteAi', body: 'Update available, go to Settings to update' });
+        sendNotification({ title: 'pasteAi', body: 'Update available, go to "About" in taskbar to update' });
       }
     }
   } catch (error) {
@@ -229,9 +229,15 @@ let copyedSameTextXTimes = 0;
 async function monitorClipboard() {
   unlistenTextUpdate = await onTextUpdate(async (newText) => {
     const currentTime = Date.now();
-    console.log("newText (" + copyedSameTextXTimes + "x) " + (currentTime - lastUpdateTime) + "ms");
+    console.log("--------------------------------");
+    console.log("- newText (" + copyedSameTextXTimes + "x) " + (currentTime - lastUpdateTime) + "ms");
+    console.log("- lastNotImprovedContent: " + lastNotImprovedContent);
+    console.log("- clipboardContent: " + clipboardContent);
+    console.log("- newText: " + newText);
+    console.log("- lastImprovedContent: " + lastImprovedContent);
+    console.log("--------------------------------");
 
-    if (newText === lastNotImprovedContent && newText != clipboardContent) {
+    if (newText === lastNotImprovedContent && newText != lastImprovedContent) {
       console.log("newText === lastNotImprovedContent do nothing but write lastImprovedContent to clipboard");
       await clipboard.writeText(lastImprovedContent);
       return;
@@ -247,7 +253,7 @@ async function monitorClipboard() {
     lastUpdateTime = currentTime;
     clipboardContent = newText;
 
-    if (copyedSameTextXTimes >= 3) {
+    if (copyedSameTextXTimes >= 3 && newText != lastNotImprovedContent) {
       console.log("copied the same text " + copyedSameTextXTimes + " times");
 
       lastNotImprovedContent = newText;
