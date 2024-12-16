@@ -20,7 +20,8 @@
             margin: 0.5rem 0;
         }
 
-        .github-link {
+        .github-link,
+        .update-button {
             display: inline-block;
             margin-top: 1rem;
             padding: 0.5rem 1rem;
@@ -29,28 +30,28 @@
             text-decoration: none;
             border-radius: 6px;
             transition: background-color 0.2s;
+            border: none;
+            cursor: pointer;
         }
 
-        .github-link:hover {
+        .github-link:hover,
+        .update-button:hover {
             background-color: #2f363d;
         }
-    </style>
-    <script type="module">
-        import { getVersion } from '@tauri-apps/api/app';
 
-        async function init() {
-            const version = await getVersion();
-            document.getElementById('version').textContent = `Version: ${version}`;
+        .update-button {
+            width: auto;
+            padding: 4px 12px;
         }
-
-        document.addEventListener('DOMContentLoaded', init);
-    </script>
+    </style>
 </head>
 
 <body>
     <div class="about-container">
         <h2>pasteAi</h2>
         <p id="version">Loading version...</p>
+        <p id="checkingUpdates">Checking for updates...</p>
+        <button id="installUpdate" class="update-button" disabled>Install update</button>
         <p>An AI-powered clipboard enhancement tool</p>
         <a href="https://github.com/LimTec-de/pasteAi" class="github-link" target="_blank">
             View on GitHub
@@ -59,6 +60,7 @@
             <a href="https://www.limtec.de/#imprint" target="_blank">Imprint (Impressum)</a>
         </p>
     </div>
+    <script type="module" src="/src/about.ts"></script>
 </body>
 
 </html>

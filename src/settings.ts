@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { Command } from '@tauri-apps/plugin-shell';
 
+
 async function fetchOllamaModels(url: string): Promise<string[]> {
     try {
         const response = await fetch(`${url}/api/tags`);
@@ -145,7 +146,7 @@ async function initializeUI() {
         console.debug('Attempting to load existing settings');
         const store = await load('store.json', { autoSave: false });
 
-        const savedLlmType = await store.get('llm_type') as string || 'ollama';
+        const savedLlmType = await store.get('llm_type') as string || 'openai';
         if (savedLlmType) {
             llmTypeSelect.value = savedLlmType;
         }

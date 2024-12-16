@@ -4,7 +4,7 @@ import { load } from '@tauri-apps/plugin-store';
 import { Window } from '@tauri-apps/api/window';
 import OpenAI from 'openai';
 import { exit } from '@tauri-apps/plugin-process';
-import { message, confirm } from '@tauri-apps/plugin-dialog';
+import { message, confirm, ask } from '@tauri-apps/plugin-dialog';
 import { info } from '@tauri-apps/plugin-log';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
 import {
@@ -56,68 +56,22 @@ async function initializeOpenAI() {
   }
 }
 
-async function checkForUpdatesTimer() {
-  if (!autoUpdateDialogOpen) {
+
+async function checkForAppUpdates() {
+  try {
     const update = await check();
     if (update) {
-      autoUpdateDialogOpen = true;
-      const confirmation = await confirm(
-        'Found update, do you want to install it?',
-        { title: 'pasteAi', kind: 'info' }
-      );
-      autoUpdateDialogOpen = false;
-      if (confirmation) {
-        await checkForUpdates();
+      if (permissionGranted) {
+        sendNotification({ title: 'pasteAi', body: 'Update available, go to Settings to update' });
       }
     }
-  } else {
-    console.log("autoUpdateDialogOpen is true, not checking for updates");
+  } catch (error) {
+    if (permissionGranted) {
+      sendNotification({ title: 'pasteAi', body: 'Error checking for updates' });
+    }
   }
 }
 
-async function checkForUpdates() {
-  const update = await check();
-  if (update) {
-    console.log(
-      `found update ${update.version} from ${update.date} with notes ${update.body}`
-    );
-    let downloaded = 0;
-    let contentLength = 0;
-    // alternatively we could also call update.download() and update.install() separately
-    await update.downloadAndInstall((event) => {
-      switch (event.event) {
-        case 'Started':
-          contentLength = event.data.contentLength ?? 0;
-          if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'Started downloading' });
-          }
-          console.log(`started downloading `);
-          break;
-        case 'Progress':
-          downloaded += event.data.chunkLength;
-          console.log(`downloaded ${downloaded} from ${contentLength}`);
-          break;
-        case 'Finished':
-          if (permissionGranted) {
-            sendNotification({ title: 'pasteAi', body: 'Download finished' });
-          }
-          console.log('download finished');
-          break;
-      }
-    });
-
-    console.log('update installed');
-    if (permissionGranted) {
-      sendNotification({ title: 'pasteAi', body: 'Update installed, restarting' });
-    }
-    await relaunch();
-  } else {
-    console.log('no update found');
-    if (permissionGranted) {
-      sendNotification({ title: 'pasteAi', body: 'no update found' });
-    }
-  }
-}
 
 async function openSettingsWindow() {
   const newWindow = new WebviewWindow('settings', {
@@ -142,8 +96,8 @@ async function openAboutWindow() {
   const newWindow = new WebviewWindow('about', {
     url: '/about.html',
     title: 'About pasteAi',
-    width: 350,
-    height: 330,
+    width: 300,
+    height: 400,
     resizable: false,
     alwaysOnTop: true,
   });
@@ -162,17 +116,10 @@ async function initializeTray() {
         },
       },
       {
-        id: 'openai-key',
+        id: 'settings',
         text: '🔑 Settings',
         action: () => {
           openSettingsWindow();
-        },
-      },
-      {
-        id: 'check-for-updates',
-        text: '🔄 Check and install updates',
-        action: () => {
-          checkForUpdates();
         },
       },
       {
@@ -186,13 +133,6 @@ async function initializeTray() {
             await enable();
             (await menu.get('autostart'))?.setText('🚫 Disable Autostart');
           }
-        },
-      },
-      {
-        id: 'debug',
-        text: '🐛 Show debug window',
-        action: () => {
-          Window.getCurrent().show();
         },
       },
       {
@@ -210,6 +150,13 @@ async function initializeTray() {
     menu,
     menuOnLeftClick: true,
     icon: await defaultWindowIcon() ?? '',
+    action: (event) => {
+      switch (event.type) {
+        case 'DoubleClick':
+          Window.getCurrent().show();
+          break;
+      }
+    },
   };
 
   await TrayIcon.new(options);
@@ -218,7 +165,8 @@ async function initializeTray() {
 
 
 async function improveSentence(msg: string): Promise<string> {
-  const llmType = await store.get('llm_type') as string;
+  const llmType = await store.get('llm_type') as string || 'openai';
+
   const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
   if (llmType === 'ollama') {
     console.log("ollama improve sentence");
@@ -244,10 +192,7 @@ async function improveSentence(msg: string): Promise<string> {
       }),
     });
 
-    //"This is a test. Hello ho ar you!=?"
-
     const data = await response.json();
-
     //console.log("ollama response: " + JSON.stringify(data));
 
     return data.response || msg;
@@ -283,7 +228,14 @@ async function monitorClipboard() {
     const currentTime = Date.now();
     console.log("newText: " + newText + " - " + (currentTime - lastUpdateTime));
 
-    if (lastImprovedContent !== newText && newText === clipboardContent && (currentTime - lastUpdateTime) < 2000 && (currentTime - lastUpdateTime) > 200) {
+    if (newText !== lastImprovedContent) {
+      console.log("newText !== clipboardContent");
+    }
+    if (newText === clipboardContent) {
+      console.log("newText === clipboardContent");
+    }
+
+    if (newText !== lastImprovedContent && newText === clipboardContent && (currentTime - lastUpdateTime) < 800 && (currentTime - lastUpdateTime) > 100) {
       console.log("copied the same");
 
       if (lastNotImprovedContent == newText) {
@@ -371,8 +323,7 @@ async function main() {
     await openStartWindow();
   }
 
-
-  setInterval(checkForUpdatesTimer, 1000 * 60 * 60 * 1);
+  await checkForAppUpdates();
 }
 
 
