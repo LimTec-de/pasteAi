@@ -50,9 +50,7 @@
     "macOS": {
       "entitlements": "./entitlements.plist",
       "exceptionDomain": "",
-      "frameworks": [],
-      "providerShortName": "Limtec GmbH",
-      "signingIdentity": "Developer ID Application: Patrick Noack (PUGGQ9J2BB)"
+      "frameworks": []
     },
     "resources": []
   }

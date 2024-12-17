@@ -157,7 +157,9 @@ async function initializeTray() {
     tooltip: 'pasteAi',
     menu,
     menuOnLeftClick: true,
-    icon: await defaultWindowIcon() ?? '',
+    icon: await defaultWindowIcon() ?? ''
+    //,
+    //iconAsTemplate: true
   };
 
   await TrayIcon.new(options);
