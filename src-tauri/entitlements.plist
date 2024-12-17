@@ -10,10 +10,6 @@
     <key>com.apple.security.app-sandbox</key>
     <true/>
 
-    <!-- Allow app updates to write to specific directories -->
-    <key>com.apple.security.files.user-selected.read-write</key>
-    <true/>
-
     <!-- Allow access to Application Support directory for storing settings -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
