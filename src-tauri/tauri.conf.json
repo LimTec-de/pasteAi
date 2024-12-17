@@ -48,10 +48,10 @@
       "icons/logo.png"
     ],
     "macOS": {
-      "entitlements": "Entitlements.plist",
+      "entitlements": "./entitlements.plist",
       "exceptionDomain": "",
       "frameworks": [],
-      "providerShortName": null,
+      "providerShortName": "Limtec GmbH",
       "signingIdentity": null
     },
     "resources": []
