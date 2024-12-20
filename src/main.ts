@@ -231,6 +231,16 @@ let copyedSameTextXTimes = 0;
 async function monitorClipboard() {
   unlistenTextUpdate = await onTextUpdate(async (newText) => {
     const currentTime = Date.now();
+
+    if (newText.length > 300) {
+      console.log("Text too long (>300 chars), skipping improvement");
+      if (permissionGranted) {
+        sendNotification({ title: 'pasteAI', body: 'Text too long (>300 chars), skipping improvement' });
+      }
+      return;
+    }
+
+
     console.log("--------------------------------");
     console.log("- newText (" + copyedSameTextXTimes + "x) " + (currentTime - lastUpdateTime) + "ms");
     console.log("- lastNotImprovedContent: " + lastNotImprovedContent);
