@@ -63,12 +63,12 @@ async function checkForAppUpdates() {
     const update = await check();
     if (update) {
       if (permissionGranted) {
-        sendNotification({ title: 'pasteAi', body: 'Update available, go to "About" in taskbar to update' });
+        sendNotification({ title: 'pasteAI', body: 'Update available, go to "About" in taskbar to update' });
       }
     }
   } catch (error) {
     if (permissionGranted) {
-      sendNotification({ title: 'pasteAi', body: 'Error checking for updates' });
+      sendNotification({ title: 'pasteAI', body: 'Error checking for updates' });
     }
   }
 }
@@ -96,7 +96,7 @@ async function openSettingsWindow() {
 async function openAboutWindow() {
   const newWindow = new WebviewWindow('about', {
     url: '/about.html',
-    title: 'About pasteAi',
+    title: 'About pasteAI',
     width: 400,
     height: 650,
     resizable: false,
@@ -154,7 +154,7 @@ async function initializeTray() {
   });
 
   const options = {
-    tooltip: 'pasteAi',
+    tooltip: 'pasteAI',
     menu,
     menuOnLeftClick: true,
     icon: await defaultWindowIcon() ?? ''
@@ -262,7 +262,7 @@ async function monitorClipboard() {
 
       try {
         if (permissionGranted) {
-          sendNotification({ title: 'pasteAi', body: 'Starting to improve sentence' });
+          sendNotification({ title: 'pasteAI', body: 'Starting to improve sentence' });
         }
 
         console.log("starting to improve sentence");
@@ -271,7 +271,7 @@ async function monitorClipboard() {
         console.log("done to improve sentence");
 
         if (permissionGranted) {
-          sendNotification({ title: 'pasteAi', body: 'Improved sentence ready' });
+          sendNotification({ title: 'pasteAI', body: 'Improved sentence ready' });
         } else {
           console.log("no permission granted for notification");
         }
@@ -279,7 +279,7 @@ async function monitorClipboard() {
       } catch (error) {
         console.error("Error improving sentence:", error);
         if (permissionGranted) {
-          sendNotification({ title: 'pasteAi', body: 'Could not improve sentence, please check your settings' });
+          sendNotification({ title: 'pasteAI', body: 'Could not improve sentence, please check your settings' });
         }
       }
 
@@ -344,7 +344,7 @@ async function main() {
 async function openStartWindow() {
   const newWindow = new WebviewWindow('start', {
     url: '/start.html',
-    title: 'pasteAi',
+    title: 'pasteAI',
     width: 700,
     height: 900,
     resizable: false,
@@ -358,7 +358,7 @@ window.addEventListener("DOMContentLoaded", async () => {
 
   // Only run initialization for main window
   if (label === 'main') {
-    //message('Hello World', { title: 'pasteAi', kind: 'error' });
+    //message('Hello World', { title: 'pasteAI', kind: 'error' });
     main().catch(error => {
       console.error('Error during initialization:', {
         message: error?.message,
@@ -366,7 +366,7 @@ window.addEventListener("DOMContentLoaded", async () => {
         fullError: error
       });
       message(`Failed to initialize application: ${error?.message || 'Unknown error'}\n${error?.stack || ''}`,
-        { title: 'pasteAi', kind: 'error' });
+        { title: 'pasteAI', kind: 'error' });
     });
   }
 });

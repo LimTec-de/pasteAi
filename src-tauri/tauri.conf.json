@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "pasteai",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "identifier": "com.pasteai.app",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -24,7 +24,7 @@
       {
         "devtools": true,
         "label": "main",
-        "title": "pasteAi",
+        "title": "pasteAI",
         "width": 150,
         "height": 150,
         "visible": false,

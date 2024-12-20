@@ -1,16 +1,16 @@
 # Ai Clipboard Text Optimizer
 
-A desktop application that automatically optimizes text when you perform two clipboard copies within a 1-second interval.
-Select and copy text (Ctrl+C or ⌘+C) and then copy again within 1 second. The improved text will be copied to your clipboard.
+A desktop application that automatically optimizes text when you perform three clipboard copies within a 1-second interval.
+Select and copy text (Ctrl+C or ⌘+C) and then copy again and again within 1 second. The improved text will be copied to your clipboard.
 
-So basically you can use this app to make your text more readable by 2 times copying and pasting.
+So basically you can use this app to make your text more readable by 3 times copying and pasting.
 
 ## Download
 
 💾 [Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
 
 ⚠️You need an OpenAI API key to use this app. You can get one [here](https://platform.openai.com/api-keys).
-Then open pasteAi settings via Tray Menu and paste your key then restart the app.
+Then open pasteAI settings via Tray Menu and paste your key then restart the app.
 
 ## Features
 
@@ -31,7 +31,7 @@ Before building the application, ensure you have the following installed:
 1. Clone the repository:
    ```bash
    git clone git@github.com:LimTec-de/pasteAi.git
-   cd pasteAi
+   cd pasteAI
    ```
 
 2. Install dependencies:
@@ -48,7 +48,7 @@ Before building the application, ensure you have the following installed:
 
 4. ⚠️ **macOS Users**: Remove the quarantine attribute to run it:
    ```bash
-   xattr -d com.apple.quarantine /Applications/pasteai.app
+   xattr -d com.apple.quarantine /Applications/pasteAI.app
    ```
 
    This step is necessary because the app is not signed (right now) and macOS may prevent it from starting.
@@ -59,7 +59,7 @@ Before building the application, ensure you have the following installed:
 2. The app will run in the background
 3. To optimize text:
    - Select and copy text (Ctrl+C or ⌘+C)
-   - Immediately copy again within 1 second
+   - Immediately copy again and again within 1 second (copy 3 times)
    - The text in your clipboard will be automatically optimized
 
 ## Development

@@ -25,6 +25,8 @@ async function initializeUI() {
             if (installUpdate) {
                 installUpdate.disabled = false;
                 installUpdate.addEventListener('click', async () => {
+                    installUpdate.disabled = true;
+                    installUpdate.textContent = 'Installing update...';
                     if (checkingUpdates) {
                         checkingUpdates.textContent = 'Installing update...';
                     }

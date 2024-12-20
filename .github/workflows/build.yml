@@ -74,8 +74,8 @@ jobs:
           OTHER_CODE_SIGN_FLAGS: --timestamp
           CI: true
         with:
-          tagName: pasteAi-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-          releaseName: 'pasteAi v__VERSION__'
+          tagName: pasteAI-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
+          releaseName: 'pasteAI v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
