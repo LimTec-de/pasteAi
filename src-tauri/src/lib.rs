@@ -33,6 +33,7 @@ fn set_system_prompt_from_settings(app: AppHandle, prompt: String) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
             Some(vec!["--autostart"]), /* arbitrary number of args to pass to your app */

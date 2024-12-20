@@ -28,6 +28,7 @@ import { relaunch } from '@tauri-apps/plugin-process';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { fetch } from '@tauri-apps/plugin-http';
 
 let openai: OpenAI;
 let permissionGranted = false;
@@ -35,6 +36,7 @@ let unlistenTextUpdate: UnlistenFn;
 let unlistenClipboard: () => Promise<void>;
 let monitorRunning = false;
 let autoUpdateDialogOpen = false;
+let appId: string;
 
 let store: Awaited<ReturnType<typeof load>>;
 
@@ -200,7 +202,7 @@ async function improveSentence(msg: string): Promise<string> {
 
     return data.response || msg;
     //return msg;
-  } else {
+  } else if (llmType === 'openai') {
 
     const completion = await openai.chat.completions.create({
       messages: [
@@ -217,6 +219,43 @@ async function improveSentence(msg: string): Promise<string> {
     });
 
     return completion.choices[0].message.content || msg;
+  } else {
+    console.log("pasteai improve sentence");
+    try {
+      const formData = new FormData();
+      formData.append('prompt', systemPrompt);
+      formData.append('text', msg);
+
+      const response = await fetch('https://api.pasteai.app/improve/' + appId, {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (data.status === 'ok') {
+        if (data.data.balance < 3) {
+          if (permissionGranted) {
+            sendNotification({ title: 'pasteAI', body: 'Almost out of balance, please recharge via https://pasteai.app' });
+          }
+          console.warn('Almost out of balance, please recharge via https://pasteai.app');
+        }
+
+        console.log("pasteai improve sentence response: " + JSON.stringify(data));
+
+        return data.data.response || msg;
+      } else {
+        console.error('PasteAI API error:', data.data.message || 'An error occurred');
+        throw new Error(data.data.message || 'An error occurred');
+      }
+
+      return msg;
+
+    } catch (error) {
+      console.error('Error calling PasteAI API:', error);
+      return msg;
+    }
+
   }
 }
 
@@ -321,6 +360,15 @@ async function main() {
   info("Main function called");
   // Do you have permission to send a notification?
   store = await load('store.json', { autoSave: false });
+
+
+  appId = await store.get('appId') as string;
+  if (!appId) {
+    const uuid = crypto.randomUUID();
+    await store.set('appId', uuid);
+    await store.save();
+  }
+
   permissionGranted = await isPermissionGranted();
 
   // If not we need to request it

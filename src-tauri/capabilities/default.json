@@ -8,6 +8,14 @@
   ],
   "permissions": [
     {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://api.pasteai.app"
+        }
+      ]
+    },
+    {
       "identifier": "shell:allow-spawn",
       "allow": [
         {

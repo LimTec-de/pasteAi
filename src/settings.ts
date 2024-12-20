@@ -3,12 +3,14 @@ import { Window } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api/core';
 import { emit } from '@tauri-apps/api/event';
 import { Command } from '@tauri-apps/plugin-shell';
+import { fetch } from '@tauri-apps/plugin-http';
 
 
 async function fetchOllamaModels(url: string): Promise<string[]> {
     try {
-        const response = await fetch(`${url}/api/tags`);
-        if (!response.ok) return [];
+        const response = await fetch(`${url}/api/tags`, {
+            method: 'GET',
+        });
         const data = await response.json();
         return data.models?.map((model: any) => model.name) || [];
     } catch (error) {
@@ -48,8 +50,10 @@ async function updateModelList() {
 
 async function checkOllamaAvailability(url: string): Promise<boolean> {
     try {
-        const response = await fetch(`${url}/api/version`);
-        return response.ok;
+        const response = await fetch(`${url}/api/version`, {
+            method: 'GET',
+        });
+        return response.status === 200;
     } catch (error) {
         console.error('Error checking Ollama availability:', error);
         return false;
@@ -63,23 +67,31 @@ async function updateOllamaStatus() {
     const ollamaStatus = document.getElementById('ollamaStatus') as HTMLDivElement;
     const ollamaUrl = document.getElementById('ollamaUrl') as HTMLInputElement;
     const apiKeyGroup = document.querySelector('.input-group:has(#apiKey)') as HTMLDivElement;
+    const pasteAISettings = document.getElementById('pasteAISettings') as HTMLDivElement;
 
-    if (llmTypeSelect?.value === 'ollama') {
-        ollamaSettings.style.display = 'block';
-        ollamaModelSettings.style.display = 'block';
-        apiKeyGroup.style.display = 'none';
+    // Hide all settings sections first
+    ollamaSettings.style.display = 'none';
+    ollamaModelSettings.style.display = 'none';
+    apiKeyGroup.style.display = 'none';
+    pasteAISettings.style.display = 'none';
 
-        const isAvailable = await checkOllamaAvailability(ollamaUrl.value);
-        ollamaStatus.style.display = isAvailable ? 'none' : 'block';
-
-        if (isAvailable) {
-            await updateModelList();
-        }
-    } else {
-        ollamaSettings.style.display = 'none';
-        ollamaModelSettings.style.display = 'none';
-        apiKeyGroup.style.display = 'block';
-        ollamaStatus.style.display = 'none';
+    // Show relevant sections based on selected LLM type
+    switch (llmTypeSelect?.value) {
+        case 'ollama':
+            ollamaSettings.style.display = 'block';
+            ollamaModelSettings.style.display = 'block';
+            const isAvailable = await checkOllamaAvailability(ollamaUrl.value);
+            ollamaStatus.style.display = isAvailable ? 'none' : 'block';
+            if (isAvailable) {
+                await updateModelList();
+            }
+            break;
+        case 'pasteai':
+            pasteAISettings.style.display = 'block';
+            break;
+        case 'openai':
+            apiKeyGroup.style.display = 'block';
+            break;
     }
 }
 
@@ -126,6 +138,28 @@ async function installPhiModel() {
     }
 }
 
+async function checkQuota(appId: string, loginMessage: HTMLDivElement) {
+    try {
+        const quotaResponse = await fetch(`https://api.pasteai.app/quota/${appId}`, {
+            method: 'GET',
+        });
+        const quotaData = await quotaResponse.json();
+
+        if (quotaData.status === 'ok') {
+            loginMessage.style.display = 'block';
+            loginMessage.style.color = '#008000';
+            loginMessage.textContent = `Your balance: ${quotaData.data.balance} sentences`;
+            // Ensure parent element is visible
+            const pasteAISettings = document.getElementById('pasteAISettings');
+            if (pasteAISettings) {
+                pasteAISettings.style.display = 'block';
+            }
+        }
+    } catch (error) {
+        console.error('Error checking quota:', error);
+    }
+}
+
 async function initializeUI() {
     console.info('Initializing settings page');
     const apiKeyInput = document.getElementById('apiKey') as HTMLInputElement;
@@ -135,20 +169,81 @@ async function initializeUI() {
     const modelSelect = document.getElementById('ollamaModel') as HTMLSelectElement;
     const installPhiButton = document.getElementById('installPhi') as HTMLButtonElement;
     const llmTypeSelect = document.getElementById('llmType') as HTMLSelectElement;
+    const loginButton = document.getElementById('loginButton') as HTMLButtonElement;
+    const loginMessage = document.getElementById('loginMessage') as HTMLDivElement;
+    const emailInput = document.getElementById('pasteAIEmail') as HTMLInputElement;
 
-    if (!saveButton || !apiKeyInput || !systemPromptInput || !ollamaUrl || !modelSelect || !installPhiButton) {
+    if (!saveButton || !apiKeyInput || !systemPromptInput || !ollamaUrl || !modelSelect || !installPhiButton || !loginButton || !loginMessage || !emailInput) {
         console.error('Required elements not found');
         return;
     }
+
+    // Check quota on initialization
+    const store = await load('store.json', { autoSave: false });
+    const appId = await store.get('appId') as string;
+    if (appId) {
+        await checkQuota(appId, loginMessage);
+    }
+
+    loginButton.addEventListener('click', async () => {
+        const email = emailInput.value.trim();
+        if (!email) {
+            loginMessage.style.display = 'block';
+            loginMessage.style.color = '#ff0000';
+            loginMessage.textContent = '⚠️ Please enter an email address';
+            return;
+        }
+
+        loginButton.disabled = true;
+        loginMessage.style.display = 'block';
+        loginMessage.style.color = '#666';
+        loginMessage.textContent = 'Sending verification email...';
+
+        try {
+            const store = await load('store.json', { autoSave: false });
+            const appId = await store.get('appId') as string;
+
+            // Save email and llmType
+            await store.set('email', email);
+            await store.set('llm_type', llmTypeSelect.value);
+            await store.save();
+
+            const response = await fetch(`https://api.pasteai.app/login/${email}/${appId}`, {
+                method: 'GET',
+            });
+            const data = await response.json();
+
+            if (data.status === 'ok') {
+                // Check quota after successful login
+                loginMessage.style.display = 'block';
+                loginMessage.style.color = '#008000';
+                loginMessage.textContent = data.data.message;
+            } else {
+                loginMessage.style.color = '#ff0000';
+                loginMessage.textContent = `⚠️ ${data.data.message || 'An error occurred'}`;
+            }
+        } catch (error) {
+            loginMessage.style.color = '#ff0000';
+            loginMessage.textContent = '⚠️ Failed to send verification email';
+            console.error('Login error:', error);
+        } finally {
+            loginButton.disabled = false;
+        }
+    });
 
     // Load existing settings
     try {
         console.debug('Attempting to load existing settings');
         const store = await load('store.json', { autoSave: false });
 
-        const savedLlmType = await store.get('llm_type') as string || 'openai';
+        const savedLlmType = await store.get('llm_type') as string || 'pasteai';
         if (savedLlmType) {
             llmTypeSelect.value = savedLlmType;
+        }
+
+        const savedEmail = await store.get('email') as string;
+        if (savedEmail) {
+            emailInput.value = savedEmail;
         }
 
         const savedOllamaUrl = await store.get('ollama_url') as string;

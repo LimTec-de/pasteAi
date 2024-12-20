@@ -14,7 +14,7 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin: 0 auto;
             background: white;
             padding: 20px;
@@ -39,6 +39,7 @@
         }
 
         input[type="text"],
+        input[type="password"],
         textarea {
             width: 100%;
             padding: 8px;
@@ -88,6 +89,10 @@
             align-items: center;
             gap: 8px;
         }
+
+        #llmType {
+            width: 200px;
+        }
     </style>
 </head>
 
@@ -96,11 +101,19 @@
         <h1>⚙️ Settings</h1>
         <div class="input-group">
             <label for="llmType">🤖 LLM Provider:</label>
-            <select id="llmType" name="llmType"
-                style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+            <select id="llmType" name="llmType" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <option value="pasteai">PasteAI Account</option>
                 <option value="ollama">Ollama (Local)</option>
                 <option value="openai">OpenAI</option>
             </select>
+        </div>
+        <div id="pasteAISettings" class="input-group">
+            <label for="pasteAIEmail">📧 Email:</label>
+            <div style="display: flex; gap: 10px;">
+                <input type="email" id="pasteAIEmail" placeholder="Enter your email" style="flex: 1;">
+                <button id="loginButton" style="white-space: nowrap;">🔑 Login</button>
+            </div>
+            <div id="loginMessage" class="status" style="margin-top: 10px;"></div>
         </div>
         <div id="ollamaSettings" class="input-group">
             <label for="ollamaUrl">🌐 Ollama URL:</label>
