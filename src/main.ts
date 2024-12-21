@@ -4,10 +4,8 @@ import { load } from '@tauri-apps/plugin-store';
 import { Window } from '@tauri-apps/api/window';
 import OpenAI from 'openai';
 import { exit } from '@tauri-apps/plugin-process';
-import { message, confirm, ask } from '@tauri-apps/plugin-dialog';
-import { info } from '@tauri-apps/plugin-log';
+import { message } from '@tauri-apps/plugin-dialog';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
-import { registerActionTypes } from '@tauri-apps/plugin-notification';
 import {
   isPermissionGranted,
   requestPermission,
@@ -18,413 +16,455 @@ import {
   startListening,
   listenToMonitorStatusUpdate,
 } from "tauri-plugin-clipboard-api";
-
 import clipboard from "tauri-plugin-clipboard-api";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { Webview } from '@tauri-apps/api/webview';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { check } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { fetch } from '@tauri-apps/plugin-http';
 
-let openai: OpenAI;
-let permissionGranted = false;
-let unlistenTextUpdate: UnlistenFn;
-let unlistenClipboard: () => Promise<void>;
-let monitorRunning = false;
-let autoUpdateDialogOpen = false;
-let appId: string;
-
-let store: Awaited<ReturnType<typeof load>>;
-
-async function initializeOpenAI() {
-  const llmType = await store.get('llm_type') as string;
-  if (llmType === 'openai') {
-    console.log('initializeOpenAI');
-
-    const openai_api_key: string = await store.get('openai_api_key') as string;
-
-    try {
-      openai = new OpenAI({
-        apiKey: openai_api_key,
-        dangerouslyAllowBrowser: true
-      });
-      console.log('OpenAI client initialized successfully');
-    } catch (error) {
-      console.error('Error initializing OpenAI:', error);
-    }
-  }
+// Types and Interfaces
+interface AppConfig {
+  MAX_TEXT_LENGTH: number;
+  COPY_DETECTION_INTERVAL: number;
+  COPY_THRESHOLD: number;
+  APP_NAME: string;
 }
 
-
-async function checkForAppUpdates() {
-  try {
-    const update = await check();
-    if (update) {
-      if (permissionGranted) {
-        sendNotification({ title: 'pasteAI', body: 'Update available, go to "About" in taskbar to update' });
-      }
-    }
-  } catch (error) {
-    if (permissionGranted) {
-      sendNotification({ title: 'pasteAI', body: 'Error checking for updates' });
-    }
-  }
+interface AppState {
+  clipboardContent: string;
+  lastUpdateTime: number;
+  lastImprovedContent: string;
+  lastNotImprovedContent: string;
+  copyCount: number;
+  monitorRunning: boolean;
+  permissionGranted: boolean;
+  autoUpdateDialogOpen: boolean;
+  appId: string;
 }
 
+interface WindowConfig {
+  settings: {
+    width: number;
+    height: number;
+    title: string;
+  };
+  about: {
+    width: number;
+    height: number;
+    title: string;
+  };
+  start: {
+    width: number;
+    height: number;
+    title: string;
+  };
+}
 
-async function openSettingsWindow() {
-  const newWindow = new WebviewWindow('settings', {
-    url: '/settings.html',
-    title: 'Settings',
+// Error type definition
+interface AppError extends Error {
+  stack?: string;
+  message: string;
+}
+
+// Configuration
+const CONFIG: AppConfig = {
+  MAX_TEXT_LENGTH: 300,
+  COPY_DETECTION_INTERVAL: 800,
+  COPY_THRESHOLD: 2,
+  APP_NAME: 'pasteAI'
+};
+
+const WINDOW_CONFIG: WindowConfig = {
+  settings: {
     width: 550,
     height: 800,
-    resizable: false,
-    alwaysOnTop: true,
-  });
-  newWindow.once('tauri://created', () => {
-    console.log('New window created');
-  });
-
-  newWindow.once('tauri://error', (error) => {
-    console.error('Failed to create window:', error);
-  });
-
-}
-
-async function openAboutWindow() {
-  const newWindow = new WebviewWindow('about', {
-    url: '/about.html',
-    title: 'About pasteAI',
+    title: 'Settings'
+  },
+  about: {
     width: 400,
     height: 650,
-    resizable: false,
-    alwaysOnTop: true,
-  });
+    title: 'About pasteAI'
+  },
+  start: {
+    width: 700,
+    height: 900,
+    title: 'pasteAI'
+  }
+};
+
+// State management
+let openai: OpenAI;
+let store: Awaited<ReturnType<typeof load>>;
+let unlistenTextUpdate: UnlistenFn;
+let unlistenClipboard: () => Promise<void>;
+
+const state: AppState = {
+  clipboardContent: "",
+  lastUpdateTime: 0,
+  lastImprovedContent: "",
+  lastNotImprovedContent: "",
+  copyCount: 0,
+  monitorRunning: false,
+  permissionGranted: false,
+  autoUpdateDialogOpen: false,
+  appId: ""
+};
+
+// Notification utilities
+const notify = async (title: string, body: string) => {
+  if (state.permissionGranted) {
+    await sendNotification({ title, body });
+  }
+  console.log(`${title}: ${body}`);
+};
+
+// Window management
+class WindowManager {
+  static async createWindow(type: keyof WindowConfig, url: string) {
+    const config = WINDOW_CONFIG[type];
+    const newWindow = new WebviewWindow(type, {
+      url: `/${url}.html`,
+      title: config.title,
+      width: config.width,
+      height: config.height,
+      resizable: false,
+      alwaysOnTop: true,
+    });
+
+    newWindow.once('tauri://created', () => {
+      console.log(`${type} window created`);
+    });
+
+    newWindow.once('tauri://error', (error) => {
+      console.error(`Failed to create ${type} window:`, error);
+    });
+
+    return newWindow;
+  }
+
+  static async openSettings() {
+    return this.createWindow('settings', 'settings');
+  }
+
+  static async openAbout() {
+    return this.createWindow('about', 'about');
+  }
+
+  static async openStart() {
+    return this.createWindow('start', 'start');
+  }
 }
 
-async function initializeTray() {
-  console.log("Initializing tray");
-  const isAutoStartEnabled = await isEnabled();
-  const menu = await Menu.new({
-    items: [
-      {
-        id: 'about',
-        text: '❓ About',
-        action: () => {
-          openAboutWindow();
-        },
-      },
-      {
-        id: 'settings',
-        text: '🔑 Settings',
-        action: () => {
-          openSettingsWindow();
-        },
-      },
-      {
-        id: 'debug',
-        text: '🐛 Show debug window',
-        action: () => {
-          Window.getCurrent().show();
-        },
-      },
-      {
-        id: 'autostart',
-        text: isAutoStartEnabled ? '🚫 Disable Autostart' : '✅ Enable Autostart',
-        action: async () => {
-          if (await isEnabled()) {
-            await disable();
-            (await menu.get('autostart'))?.setText('✅ Enable Autostart');
-          } else {
-            await enable();
-            (await menu.get('autostart'))?.setText('🚫 Disable Autostart');
-          }
-        },
-      },
-      {
-        id: 'quit',
-        text: '🚪 Quit',
-        action: () => {
-          exit(0);
-        },
-      },
-    ],
-  });
+// LLM Service
+class LLMService {
+  static async initialize() {
+    const llmType = await store.get('llm_type') as string;
+    if (llmType === 'openai') {
+      const apiKey = await store.get('openai_api_key') as string;
+      try {
+        openai = new OpenAI({
+          apiKey,
+          dangerouslyAllowBrowser: true
+        });
+        console.log('OpenAI client initialized successfully');
+      } catch (error) {
+        console.error('Error initializing OpenAI:', error);
+      }
+    }
+  }
 
-  const options = {
-    tooltip: 'pasteAI',
-    menu,
-    menuOnLeftClick: true,
-    icon: await defaultWindowIcon() ?? ''
-    //,
-    //iconAsTemplate: true
-  };
+  static async improveSentence(text: string): Promise<string> {
+    const llmType = await store.get('llm_type') as string || 'openai';
+    const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
 
-  await TrayIcon.new(options);
-}
+    try {
+      switch (llmType) {
+        case 'ollama':
+          return await this.improveWithOllama(text, systemPrompt);
+        case 'openai':
+          return await this.improveWithOpenAI(text, systemPrompt);
+        default:
+          return await this.improveWithPasteAI(text, systemPrompt);
+      }
+    } catch (error) {
+      console.error(`Error improving text with ${llmType}:`, error);
+      throw error;
+    }
+  }
 
-
-
-async function improveSentence(msg: string): Promise<string> {
-  const llmType = await store.get('llm_type') as string || 'openai';
-
-  const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
-  if (llmType === 'ollama') {
-    console.log("ollama improve sentence");
+  private static async improveWithOllama(text: string, systemPrompt: string): Promise<string> {
     const ollamaUrl = await store.get('ollama_url') as string;
-    const ollama_model = await store.get('ollama_model') as string;
-
-    /*console.log("ollama: " + JSON.stringify({
-      model: ollama_model,
-      prompt: systemPrompt + "\n" + msg,
-      stream: false
-    }));*/
+    const ollamaModel = await store.get('ollama_model') as string;
 
     const response = await fetch(`${ollamaUrl}/api/generate`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: ollama_model,
+        model: ollamaModel,
         system: systemPrompt,
-        prompt: msg,
+        prompt: text,
         stream: false
       }),
     });
 
     const data = await response.json();
-    //console.log("ollama response: " + JSON.stringify(data));
+    return data.response || text;
+  }
 
-    return data.response || msg;
-    //return msg;
-  } else if (llmType === 'openai') {
-
+  private static async improveWithOpenAI(text: string, systemPrompt: string): Promise<string> {
     const completion = await openai.chat.completions.create({
       messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: msg
-        }
+        { role: "system", content: systemPrompt },
+        { role: "user", content: text }
       ],
       model: "gpt-4o-mini",
     });
 
-    return completion.choices[0].message.content || msg;
-  } else {
-    console.log("pasteai improve sentence");
-    try {
-      const formData = new FormData();
-      formData.append('prompt', systemPrompt);
-      formData.append('text', msg);
+    return completion.choices[0].message.content || text;
+  }
 
-      const response = await fetch('https://api.pasteai.app/improve/' + appId, {
-        method: 'POST',
-        body: formData
-      });
+  private static async improveWithPasteAI(text: string, systemPrompt: string): Promise<string> {
+    const formData = new FormData();
+    formData.append('prompt', systemPrompt);
+    formData.append('text', text);
 
-      const data = await response.json();
+    const response = await fetch(`https://api.pasteai.app/improve/${state.appId}`, {
+      method: 'POST',
+      body: formData
+    });
 
-      if (data.status === 'ok') {
-        if (data.data.balance < 3) {
-          if (permissionGranted) {
-            sendNotification({ title: 'pasteAI', body: 'Almost out of balance, please recharge via https://pasteai.app' });
-          }
-          console.warn('Almost out of balance, please recharge via https://pasteai.app');
-        }
+    const data = await response.json();
 
-        console.log("pasteai improve sentence response: " + JSON.stringify(data));
-
-        return data.data.response || msg;
-      } else {
-        console.error('PasteAI API error:', data.data.message || 'An error occurred');
-        throw new Error(data.data.message || 'An error occurred');
+    if (data.status === 'ok') {
+      if (data.data.balance < 3) {
+        await notify(CONFIG.APP_NAME, 'Almost out of balance, please recharge via https://pasteai.app');
       }
-
-      return msg;
-
-    } catch (error) {
-      console.error('Error calling PasteAI API:', error);
-      return msg;
+      return data.data.response || text;
     }
 
+    throw new Error(data.data.message || 'An error occurred');
   }
 }
 
+// Clipboard monitoring
+class ClipboardMonitor {
+  static async initialize() {
+    unlistenTextUpdate = await onTextUpdate(async (newText) => {
+      await this.handleTextUpdate(newText);
+    });
 
-let clipboardContent = "";
-let lastUpdateTime = 0;
-let lastImprovedContent = "";
-let lastNotImprovedContent = "";
+    unlistenClipboard = await startListening();
+  }
 
-let copyedSameTextXTimes = 0;
+  private static async handleTextUpdate(newText: string) {
+    if (newText.length > CONFIG.MAX_TEXT_LENGTH) {
+      await notify(CONFIG.APP_NAME, `Text too long (>${CONFIG.MAX_TEXT_LENGTH} chars), skipping improvement`);
+      return;
+    }
 
-async function monitorClipboard() {
-  unlistenTextUpdate = await onTextUpdate(async (newText) => {
     const currentTime = Date.now();
+    const timeDiff = currentTime - state.lastUpdateTime;
 
-    if (newText.length > 300) {
-      console.log("Text too long (>300 chars), skipping improvement");
-      if (permissionGranted) {
-        sendNotification({ title: 'pasteAI', body: 'Text too long (>300 chars), skipping improvement' });
-      }
+    if (this.shouldSkipImprovement(newText, timeDiff)) {
+      await this.handleSkippedImprovement(newText);
       return;
     }
 
+    await this.updateClipboardState(newText, currentTime);
 
-    console.log("--------------------------------");
-    console.log("- newText (" + copyedSameTextXTimes + "x) " + (currentTime - lastUpdateTime) + "ms");
-    console.log("- lastNotImprovedContent: " + lastNotImprovedContent);
-    console.log("- clipboardContent: " + clipboardContent);
-    console.log("- newText: " + newText);
-    console.log("- lastImprovedContent: " + lastImprovedContent);
-    console.log("--------------------------------");
-
-    if (newText === lastNotImprovedContent && newText != lastImprovedContent) {
-      console.log("newText === lastNotImprovedContent do nothing but write lastImprovedContent to clipboard");
-      await clipboard.writeText(lastImprovedContent);
-      return;
+    if (this.shouldImproveText(newText)) {
+      await this.improveAndUpdateClipboard(newText);
     }
+  }
 
-    if (newText === clipboardContent && (currentTime - lastUpdateTime) < 800 && (currentTime - lastUpdateTime) > 100) {
-      copyedSameTextXTimes++;
-      console.log("copyedSameTextXTimes++");
+  private static shouldSkipImprovement(newText: string, timeDiff: number): boolean {
+    return newText === state.lastNotImprovedContent && newText !== state.lastImprovedContent;
+  }
+
+  private static async handleSkippedImprovement(newText: string) {
+    if (state.lastImprovedContent) {
+      await clipboard.writeText(state.lastImprovedContent);
+    }
+  }
+
+  private static async updateClipboardState(newText: string, currentTime: number) {
+    const isRecentCopy = currentTime - state.lastUpdateTime < CONFIG.COPY_DETECTION_INTERVAL;
+
+    if (newText === state.clipboardContent && isRecentCopy) {
+      state.copyCount++;
     } else {
-      copyedSameTextXTimes = 1;
+      state.copyCount = 1;
     }
 
-    lastUpdateTime = currentTime;
-    clipboardContent = newText;
+    state.lastUpdateTime = currentTime;
+    state.clipboardContent = newText;
+  }
 
-    if (copyedSameTextXTimes >= 2 && newText != lastNotImprovedContent) {
-      console.log("copied the same text " + copyedSameTextXTimes + " times");
+  private static shouldImproveText(newText: string): boolean {
+    return state.copyCount >= CONFIG.COPY_THRESHOLD && newText !== state.lastNotImprovedContent;
+  }
 
-      lastNotImprovedContent = newText;
+  private static async improveAndUpdateClipboard(newText: string) {
+    state.lastNotImprovedContent = newText;
 
-      try {
-        if (permissionGranted) {
-          sendNotification({ title: 'pasteAI', body: 'Starting to improve sentence' });
-        }
+    try {
+      await notify(CONFIG.APP_NAME, 'Starting to improve sentence');
 
-        console.log("starting to improve sentence");
-        lastImprovedContent = await improveSentence(newText);
-        await clipboard.writeText(lastImprovedContent);
-        console.log("done to improve sentence");
+      state.lastImprovedContent = await LLMService.improveSentence(newText);
+      await clipboard.writeText(state.lastImprovedContent);
 
-        if (permissionGranted) {
-          sendNotification({ title: 'pasteAI', body: 'Improved sentence ready' });
-        } else {
-          console.log("no permission granted for notification");
-        }
-        console.log("improvedContent: ------------------------------>" + lastImprovedContent);
-      } catch (error) {
-        console.error("Error improving sentence:", error);
-        if (permissionGranted) {
-          sendNotification({ title: 'pasteAI', body: 'Could not improve sentence, please check your settings' });
-        }
-      }
-
-
-
+      await notify(CONFIG.APP_NAME, 'Improved sentence ready');
+    } catch (error) {
+      console.error("Error improving sentence:", error);
+      await notify(CONFIG.APP_NAME, 'Could not improve sentence, please check your settings');
     }
-
-
-  });
-
-  unlistenClipboard = await startListening();
+  }
 }
 
-listenToMonitorStatusUpdate((running) => {
-  monitorRunning = running;
-});
+// Tray management
+class TrayManager {
+  private static currentMenu: Menu | null = null;
 
-/*onDestroy(() => {
-  if (unlistenTextUpdate) unlistenTextUpdate();
-  if (unlistenImageUpdate) unlistenImageUpdate();
-  if (unlistenHtmlUpdate) unlistenHtmlUpdate();
-  if (unlistenFiles) unlistenFiles();
-  if (unlistenClipboard) unlistenClipboard();
-});
-*/
+  static async initialize() {
+    const isAutoStartEnabled = await isEnabled();
+    this.currentMenu = await this.createMenu(isAutoStartEnabled);
 
+    const options = {
+      tooltip: CONFIG.APP_NAME,
+      menu: this.currentMenu,
+      menuOnLeftClick: true,
+      icon: await defaultWindowIcon() ?? ''
+    };
 
-async function main() {
-  info("Main function called");
-  // Do you have permission to send a notification?
+    await TrayIcon.new(options);
+  }
+
+  private static async createMenu(isAutoStartEnabled: boolean) {
+    return await Menu.new({
+      items: [
+        {
+          id: 'about',
+          text: '❓ About',
+          action: () => WindowManager.openAbout(),
+        },
+        {
+          id: 'settings',
+          text: '🔑 Settings',
+          action: () => WindowManager.openSettings(),
+        },
+        {
+          id: 'debug',
+          text: '🐛 Show debug window',
+          action: () => Window.getCurrent().show(),
+        },
+        {
+          id: 'autostart',
+          text: isAutoStartEnabled ? '🚫 Disable Autostart' : '✅ Enable Autostart',
+          action: async () => {
+            await this.toggleAutostart();
+          },
+        },
+        {
+          id: 'quit',
+          text: '🚪 Quit',
+          action: () => exit(0),
+        },
+      ],
+    });
+  }
+
+  private static async toggleAutostart() {
+    if (!this.currentMenu) return;
+
+    const isAutoStartEnabled = await this.isAutoStartEnabled();
+
+    if (isAutoStartEnabled) {
+      await disable();
+      const menuItem = await this.currentMenu.get('autostart');
+      if (menuItem) await menuItem.setText('✅ Enable Autostart');
+    } else {
+      await enable();
+      const menuItem = await this.currentMenu.get('autostart');
+      if (menuItem) await menuItem.setText('🚫 Disable Autostart');
+    }
+  }
+
+  private static async isAutoStartEnabled(): Promise<boolean> {
+    return await isEnabled();
+  }
+}
+
+// Application initialization
+async function initializeApp() {
   store = await load('store.json', { autoSave: false });
 
-
-  appId = await store.get('appId') as string;
-  if (!appId) {
-    const uuid = crypto.randomUUID();
-    await store.set('appId', uuid);
+  // Initialize app ID
+  state.appId = await store.get('appId') as string;
+  if (!state.appId) {
+    state.appId = crypto.randomUUID();
+    await store.set('appId', state.appId);
     await store.save();
   }
 
-  permissionGranted = await isPermissionGranted();
-
-  // If not we need to request it
-  if (!permissionGranted) {
+  // Initialize notifications
+  state.permissionGranted = await isPermissionGranted();
+  if (!state.permissionGranted) {
     const permission = await requestPermission();
-    permissionGranted = permission === 'granted';
-  }
-  await listen<{ loggedIn: boolean, token: string }>('settings-saved', async (event) => {
-    console.log('Settings saved:', event.payload);
-    await initializeOpenAI();
-  });
-
-  await listen<{ loggedIn: boolean, token: string }>('open-settings-window', async (event) => {
-    console.log('Settings saved:', event.payload);
-    await openSettingsWindow();
-  });
-
-
-  await initializeTray();
-  await initializeOpenAI();
-  await monitorClipboard();
-
-  if ((await store.get('show_start')) != false) {
-    await openStartWindow();
+    state.permissionGranted = permission === 'granted';
   }
 
-  await checkForAppUpdates();
-}
-
-
-async function openStartWindow() {
-  const newWindow = new WebviewWindow('start', {
-    url: '/start.html',
-    title: 'pasteAI',
-    width: 700,
-    height: 900,
-    resizable: false,
-    alwaysOnTop: true,
+  // Set up event listeners
+  await listen<{ loggedIn: boolean, token: string }>('settings-saved', async () => {
+    await LLMService.initialize();
   });
+
+  await listen<{ loggedIn: boolean, token: string }>('open-settings-window', async () => {
+    await WindowManager.openSettings();
+  });
+
+  // Initialize core services
+  await TrayManager.initialize();
+  await LLMService.initialize();
+  await ClipboardMonitor.initialize();
+
+  // Show start window if needed
+  if ((await store.get('show_start')) !== false) {
+    await WindowManager.openStart();
+  }
+
+  // Check for updates
+  try {
+    const update = await check();
+    if (update) {
+      await notify(CONFIG.APP_NAME, 'Update available, go to "About" in taskbar to update');
+    }
+  } catch (error) {
+    await notify(CONFIG.APP_NAME, 'Error checking for updates');
+  }
 }
 
+// Application entry point
 window.addEventListener("DOMContentLoaded", async () => {
-  // Get current window label
   const label = Window.getCurrent().label;
 
-  // Only run initialization for main window
   if (label === 'main') {
-    //message('Hello World', { title: 'pasteAI', kind: 'error' });
-    main().catch(error => {
+    try {
+      await initializeApp();
+    } catch (error) {
+      const appError = error as AppError;
       console.error('Error during initialization:', {
-        message: error?.message,
-        stack: error?.stack,
+        message: appError.message || 'Unknown error',
+        stack: appError.stack,
         fullError: error
       });
-      message(`Failed to initialize application: ${error?.message || 'Unknown error'}\n${error?.stack || ''}`,
-        { title: 'pasteAI', kind: 'error' });
-    });
+
+      await message(
+        `Failed to initialize application: ${appError.message || 'Unknown error'}\n${appError.stack || ''}`,
+        { title: CONFIG.APP_NAME, kind: 'error' }
+      );
+    }
   }
 });
