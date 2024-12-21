@@ -1,52 +1,85 @@
 import { getVersion } from '@tauri-apps/api/app';
-import { emit } from '@tauri-apps/api/event';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
-async function initializeUI() {
+interface UIElements {
+    version: HTMLElement | null;
+    checkingUpdates: HTMLElement | null;
+    installUpdate: HTMLButtonElement | null;
+}
+
+function getUIElements(): UIElements {
+    return {
+        version: document.getElementById('version'),
+        checkingUpdates: document.getElementById('checkingUpdates'),
+        installUpdate: document.getElementById('installUpdate') as HTMLButtonElement | null
+    };
+}
+
+async function displayVersion(versionElement: HTMLElement | null) {
+    if (!versionElement) return;
     const version = await getVersion();
-    const versionElement = document.getElementById('version');
-    if (versionElement) {
-        versionElement.textContent = `Version: ${version}`;
-    }
+    versionElement.textContent = `Version: ${version}`;
+}
 
-    const checkUpdates = document.getElementById('checkUpdates') as HTMLButtonElement;
-    const checkingUpdates = document.getElementById('checkingUpdates');
-    const installUpdate = document.getElementById('installUpdate') as HTMLButtonElement;
-
+async function handleUpdate(elements: UIElements) {
+    const { checkingUpdates, installUpdate } = elements;
 
     try {
         const update = await check();
 
-        if (update) {
-            if (checkingUpdates) {
-                checkingUpdates.textContent = `Update available: ${update.version}`;
-            }
-            if (installUpdate) {
-                installUpdate.disabled = false;
-                installUpdate.addEventListener('click', async () => {
-                    installUpdate.disabled = true;
-                    installUpdate.textContent = 'Installing update...';
-                    if (checkingUpdates) {
-                        checkingUpdates.textContent = 'Installing update...';
-                    }
-                    await update.downloadAndInstall();
-                    await relaunch();
-                });
-            }
-        } else {
+        if (!update) {
             if (checkingUpdates) {
                 checkingUpdates.textContent = 'No updates available';
             }
+            return;
+        }
+
+        if (checkingUpdates) {
+            checkingUpdates.textContent = `Update available: ${update.version}`;
+        }
+
+        if (installUpdate) {
+            installUpdate.disabled = false;
+            installUpdate.addEventListener('click', () => handleInstallation(update, elements));
         }
     } catch (error) {
         if (checkingUpdates) {
             checkingUpdates.textContent = `Error checking for updates: ${error}`;
         }
     }
-
 }
 
-window.addEventListener("DOMContentLoaded", async () => {
-    await initializeUI();
-});
+async function handleInstallation(update: any, elements: UIElements) {
+    const { installUpdate, checkingUpdates } = elements;
+
+    if (!installUpdate) return;
+
+    installUpdate.disabled = true;
+    installUpdate.textContent = 'Installing update...';
+
+    if (checkingUpdates) {
+        checkingUpdates.textContent = 'Installing update...';
+    }
+
+    try {
+        await update.downloadAndInstall();
+        await relaunch();
+    } catch (error) {
+        if (checkingUpdates) {
+            checkingUpdates.textContent = `Error installing update: ${error}`;
+        }
+        if (installUpdate) {
+            installUpdate.disabled = false;
+            installUpdate.textContent = 'Retry Installation';
+        }
+    }
+}
+
+async function initializeUI() {
+    const elements = getUIElements();
+    await displayVersion(elements.version);
+    await handleUpdate(elements);
+}
+
+window.addEventListener("DOMContentLoaded", initializeUI);
