@@ -17,45 +17,17 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        .app-title {
+        .about-container h2 {
             font-size: 2.5rem;
             margin-bottom: 1rem;
             color: #1a1a1a;
             font-weight: 700;
         }
 
-        .app-description {
+        .about-container p {
+            margin: 0.8rem 0;
             color: #4a4a4a;
             line-height: 1.6;
-            margin: 0.8rem 0;
-        }
-
-        .button {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.75rem 1.5rem;
-            background-color: #24292e;
-            color: white;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            text-decoration: none;
-        }
-
-        .button:hover:not(:disabled) {
-            background-color: #2f363d;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-        }
-
-        .button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
         }
 
         .button-group {
@@ -63,6 +35,36 @@
             gap: 1rem;
             justify-content: center;
             margin-top: 2rem;
+        }
+
+        .github-link,
+        .update-button {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.75rem 1.5rem;
+            background-color: #24292e;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .github-link:hover,
+        .update-button:hover {
+            background-color: #2f363d;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .update-button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
 
         .version-info {
@@ -94,7 +96,7 @@
                 padding: 1.5rem;
             }
 
-            .app-title {
+            .about-container h2 {
                 font-size: 2rem;
             }
 
@@ -107,23 +109,23 @@
 
 <body>
     <div class="about-container">
-        <h1 class="app-title">pasteAI</h1>
-        <p class="app-description">An AI-powered clipboard enhancement tool</p>
+        <h2>pasteAI</h2>
+        <p>An AI-powered clipboard enhancement tool</p>
 
         <div class="version-info">
             <p id="version">Loading version...</p>
             <p id="checkingUpdates">Checking for updates...</p>
-            <button id="installUpdate" class="button" disabled>Install update</button>
+            <button id="installUpdate" class="update-button" disabled>Install update</button>
         </div>
 
         <div class="button-group">
-            <a href="https://github.com/LimTec-de/pasteAi" class="button" target="_blank" rel="noopener noreferrer">
+            <a href="https://github.com/LimTec-de/pasteAi" class="github-link" target="_blank">
                 View on GitHub
             </a>
         </div>
 
         <div class="footer-links">
-            <a href="https://www.limtec.de/#imprint" target="_blank" rel="noopener noreferrer">Imprint (Impressum)</a>
+            <a href="https://www.limtec.de/#imprint" target="_blank">Imprint (Impressum)</a>
         </div>
     </div>
     <script type="module" src="/src/about.ts"></script>
