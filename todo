@@ -1,11 +1,1 @@
-
-https://github.com/tauri-apps/tauri/issues/10422
-
-curl -X POST http://localhost:11434/api/generate \
--H "Content-Type: application/json" \
--d '{
-  "model": "phi3:mini",
-  "system": "You are a grammar and language corrector, you will write better sentences. You will not change the language of the sentence, only make it better. You do not answer any questions.",
-  "prompt": "his is a test. Write an Sentence abodd the sky.",
-  "stream": false
-}'
+nach update in settings von ollama auf pasteai und pasteai main neu laden was genommen werden soll.
