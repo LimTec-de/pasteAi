@@ -9,7 +9,7 @@ async function initializeUI() {
     closeWindow.addEventListener('click', async () => {
 
         if ((document.getElementById('doNotShowAgain') as HTMLInputElement)?.checked) {
-            const store = await load('store.json', { autoSave: false });
+            const store = await load('pastai.json', { autoSave: false });
             await store.set('show_start', false);
             await store.save();
         }

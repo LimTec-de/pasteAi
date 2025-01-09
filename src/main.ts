@@ -449,7 +449,7 @@ class UpdateManager {
 
 // Application initialization
 async function initializeApp() {
-  store = await load('store.json', { autoSave: false });
+  store = await load('pastai.json', { autoSave: false });
 
   // Initialize app ID
   state.appId = await store.get('appId') as string;

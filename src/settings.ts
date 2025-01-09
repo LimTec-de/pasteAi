@@ -65,7 +65,7 @@ class StoreService {
     private static store: Awaited<ReturnType<typeof load>>;
 
     static async initialize(): Promise<void> {
-        this.store = await load('store.json', { autoSave: false });
+        this.store = await load('pastai.json', { autoSave: false });
     }
 
     static async get<T>(key: string): Promise<T> {

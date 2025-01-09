@@ -12,7 +12,7 @@ fn get_system_prompt_from_settings(app: AppHandle) -> String {
 
     let default_prompt = "Act as a grammar and language corrector. Improve the sentences without changing the language. Keep it casual and natural, as if written by a human. Do not answer any questions. If the input seems to be a random string or password or an url, do not correct or change anything.";
 
-    let store = app.store("store.json").expect("Failed to access store");
+    let store = app.store("pastai.json").expect("Failed to access store");
 
     let system_prompt = store.get("system_prompt").unwrap_or(json!(""));
 
@@ -25,7 +25,7 @@ fn get_system_prompt_from_settings(app: AppHandle) -> String {
 
 #[tauri::command]
 fn set_system_prompt_from_settings(app: AppHandle, prompt: String) {
-    let store = app.store("store.json").expect("Failed to access store");
+    let store = app.store("pastai.json").expect("Failed to access store");
     store.set("system_prompt", prompt);
 }
 
@@ -41,7 +41,7 @@ pub fn run() {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            let store = app.store("store.json")?;
+            let store = app.store("pastai.json")?;
             Ok(())
         })
         .plugin(tauri_plugin_notification::init())
