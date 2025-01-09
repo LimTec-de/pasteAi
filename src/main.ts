@@ -1,5 +1,5 @@
 import { TrayIcon } from '@tauri-apps/api/tray';
-import { Menu } from '@tauri-apps/api/menu';
+import { Menu, PredefinedMenuItem } from '@tauri-apps/api/menu';
 import { load } from '@tauri-apps/plugin-store';
 import { Window } from '@tauri-apps/api/window';
 import OpenAI from 'openai';
@@ -347,30 +347,34 @@ class TrayManager {
     return await Menu.new({
       items: [
         {
-          id: 'about',
-          text: '❓ About',
-          action: () => WindowManager.openAbout(),
-        },
-        {
-          id: 'settings',
-          text: '🔑 Settings',
-          action: () => WindowManager.openSettings(),
-        },
-        {
-          id: 'debug',
-          text: '🐛 Show debug window',
-          action: () => Window.getCurrent().show(),
-        },
-        {
           id: 'autostart',
-          text: isAutoStartEnabled ? '🚫 Disable Autostart' : '✅ Enable Autostart',
+          text: 'Start with system',
+          checked: isAutoStartEnabled,
           action: async () => {
             await this.toggleAutostart();
           },
         },
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        {
+          id: 'settings',
+          text: 'Settings',
+          action: () => WindowManager.openSettings(),
+        },
+        {
+          id: 'about',
+          text: 'About',
+          action: () => WindowManager.openAbout(),
+        },
+        await PredefinedMenuItem.new({ item: 'Separator' }),
+        {
+          id: 'debug',
+          text: 'Show debug window',
+          action: () => Window.getCurrent().show(),
+        },
+        await PredefinedMenuItem.new({ item: 'Separator' }),
         {
           id: 'quit',
-          text: '🚪 Quit',
+          text: 'Quit',
           action: () => exit(0),
         },
       ],
@@ -385,11 +389,11 @@ class TrayManager {
     if (isAutoStartEnabled) {
       await disable();
       const menuItem = await this.currentMenu.get('autostart');
-      if (menuItem) await menuItem.setText('✅ Enable Autostart');
+      if (menuItem) await menuItem.setText('Enable Autostart');
     } else {
       await enable();
       const menuItem = await this.currentMenu.get('autostart');
-      if (menuItem) await menuItem.setText('🚫 Disable Autostart');
+      if (menuItem) await menuItem.setText('Disable Autostart');
     }
   }
 
