@@ -260,10 +260,6 @@ class ClipboardMonitor {
   }
 
   private static async handleTextUpdate(newText: string) {
-    if (newText.length > CONFIG.MAX_TEXT_LENGTH) {
-      await notify(CONFIG.APP_NAME, `Text too long (>${CONFIG.MAX_TEXT_LENGTH} chars), skipping improvement`);
-      return;
-    }
 
     const currentTime = Date.now();
     const timeDiff = currentTime - state.lastUpdateTime;
@@ -276,7 +272,12 @@ class ClipboardMonitor {
     await this.updateClipboardState(newText, currentTime);
 
     if (this.shouldImproveText(newText)) {
-      await this.improveAndUpdateClipboard(newText);
+      if (newText.length > CONFIG.MAX_TEXT_LENGTH) {
+        await notify(CONFIG.APP_NAME, `Text too long (>${CONFIG.MAX_TEXT_LENGTH} chars), skipping improvement`);
+        return;
+      } else {
+        await this.improveAndUpdateClipboard(newText);
+      }
     }
   }
 
