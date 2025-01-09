@@ -3,8 +3,8 @@ import { Menu, PredefinedMenuItem } from '@tauri-apps/api/menu';
 import { load } from '@tauri-apps/plugin-store';
 import { Window } from '@tauri-apps/api/window';
 import OpenAI from 'openai';
-import { exit } from '@tauri-apps/plugin-process';
-import { message } from '@tauri-apps/plugin-dialog';
+import { exit, relaunch } from '@tauri-apps/plugin-process';
+import { message, confirm } from '@tauri-apps/plugin-dialog';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
 import {
   isPermissionGranted,
@@ -91,7 +91,7 @@ const WINDOW_CONFIG: WindowConfig = {
   start: {
     width: 700,
     height: 900,
-    title: 'pasteAI'
+    title: CONFIG.APP_NAME
   }
 };
 
@@ -356,6 +356,13 @@ class TrayManager {
         },
         await PredefinedMenuItem.new({ item: 'Separator' }),
         {
+          id: 'checkUpdates',
+          text: 'Check for Updates...',
+          action: async () => {
+            await UpdateManager.checkUpdate(true);
+          }
+        },
+        {
           id: 'settings',
           text: 'Settings',
           action: () => WindowManager.openSettings(),
@@ -402,6 +409,44 @@ class TrayManager {
   }
 }
 
+// Update checker
+class UpdateManager {
+  static async checkUpdate(shouldNotify: boolean) {
+    try {
+      const update = await check();
+
+      if (update) {
+        const shouldUpdate = await confirm(`Update available: ${update.version}. Install?`, {
+          title: CONFIG.APP_NAME,
+          kind: 'info'
+        });
+
+        if (shouldUpdate) {
+          console.log('Installing update');
+          await update.downloadAndInstall();
+          await relaunch();
+        }
+      } else if (shouldNotify) {
+        await message('No update found', {
+          title: CONFIG.APP_NAME,
+          kind: 'info'
+        });
+      }
+    } catch (error) {
+      console.error('Error checking for updates:', error);
+      if (shouldNotify) {
+        await message('Error checking for updates', {
+          title: CONFIG.APP_NAME,
+          kind: 'error'
+        });
+      } else {
+        await notify(CONFIG.APP_NAME, 'Error checking for updates');
+      }
+    }
+  }
+}
+
+
 // Application initialization
 async function initializeApp() {
   store = await load('store.json', { autoSave: false });
@@ -441,14 +486,7 @@ async function initializeApp() {
   }
 
   // Check for updates
-  try {
-    const update = await check();
-    if (update) {
-      await notify(CONFIG.APP_NAME, 'Update available, go to "About" in taskbar to update');
-    }
-  } catch (error) {
-    await notify(CONFIG.APP_NAME, 'Error checking for updates');
-  }
+  await UpdateManager.checkUpdate(false);
 }
 
 // Application entry point

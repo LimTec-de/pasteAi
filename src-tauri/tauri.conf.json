@@ -25,10 +25,13 @@
         "devtools": true,
         "label": "main",
         "title": "pasteAI",
-        "width": 150,
-        "height": 150,
+        "width": 1,
+        "height": 1,
         "visible": false,
-        "skipTaskbar": true
+        "skipTaskbar": true,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": false
       }
     ],
     "security": {

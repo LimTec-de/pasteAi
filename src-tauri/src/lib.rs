@@ -3,7 +3,6 @@ use std::process::exit;
 use tauri::AppHandle;
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_store::StoreExt;
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 
 #[tauri::command]
 fn get_system_prompt_from_settings(app: AppHandle) -> String {
