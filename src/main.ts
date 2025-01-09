@@ -262,10 +262,10 @@ class ClipboardMonitor {
   private static async handleTextUpdate(newText: string) {
 
     const currentTime = Date.now();
-    const timeDiff = currentTime - state.lastUpdateTime;
+    //const timeDiff = currentTime - state.lastUpdateTime;
 
-    if (this.shouldSkipImprovement(newText, timeDiff)) {
-      await this.handleSkippedImprovement(newText);
+    if (this.shouldSkipImprovement(newText)) {
+      await this.handleSkippedImprovement();
       return;
     }
 
@@ -281,11 +281,11 @@ class ClipboardMonitor {
     }
   }
 
-  private static shouldSkipImprovement(newText: string, timeDiff: number): boolean {
+  private static shouldSkipImprovement(newText: string): boolean {
     return newText === state.lastNotImprovedContent && newText !== state.lastImprovedContent;
   }
 
-  private static async handleSkippedImprovement(newText: string) {
+  private static async handleSkippedImprovement() {
     if (state.lastImprovedContent) {
       await clipboard.writeText(state.lastImprovedContent);
     }
