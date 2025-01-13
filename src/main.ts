@@ -320,7 +320,7 @@ class ClipboardMonitor {
       await notify(CONFIG.APP_NAME, 'Improved sentence ready');
     } catch (error) {
       console.error("Error improving sentence:", error);
-      await notify(CONFIG.APP_NAME, 'Could not improve sentence, please check your settings');
+      await notify(CONFIG.APP_NAME, `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 }
@@ -420,6 +420,7 @@ class UpdateManager {
           title: CONFIG.APP_NAME,
           kind: 'info'
         });
+        (await Window.getByLabel('main'))?.hide();
 
         if (shouldUpdate) {
           console.log('Installing update');
@@ -431,6 +432,7 @@ class UpdateManager {
           title: CONFIG.APP_NAME,
           kind: 'info'
         });
+        (await Window.getByLabel('main'))?.hide();
       }
     } catch (error) {
       console.error('Error checking for updates:', error);
@@ -439,6 +441,7 @@ class UpdateManager {
           title: CONFIG.APP_NAME,
           kind: 'error'
         });
+        (await Window.getByLabel('main'))?.hide();
       } else {
         await notify(CONFIG.APP_NAME, 'Error checking for updates');
       }

@@ -1,1 +1,4 @@
 nach update in settings von ollama auf pasteai und pasteai main neu laden was genommen werden soll.
+
+./Library/Application Support/com.pasteai.app/pastai.json
+./Library/Containers/com.pasteai.app/Data/Library/Application Support/com.pasteai.app/pastai.json

@@ -22,6 +22,8 @@ interface UIElements {
     ollamaStatus: HTMLDivElement;
     apiKeyGroup: HTMLDivElement;
     pasteAISettings: HTMLDivElement;
+    checkQuotaButton: HTMLButtonElement;
+    quotaDisplay: HTMLDivElement;
 }
 
 type LLMType = 'pasteai' | 'ollama' | 'openai';
@@ -144,13 +146,14 @@ class SettingsManager {
     }
 
     private async initializeEventListeners(): Promise<void> {
-        const { llmTypeSelect, ollamaUrl, installPhiButton, loginButton, saveButton } = this.elements;
+        const { llmTypeSelect, ollamaUrl, installPhiButton, loginButton, saveButton, checkQuotaButton } = this.elements;
 
         llmTypeSelect.addEventListener('change', () => this.handleLLMTypeChange());
         ollamaUrl.addEventListener('change', () => this.handleLLMTypeChange());
         installPhiButton.addEventListener('click', () => this.handlePhiInstall());
         loginButton.addEventListener('click', () => this.handleLogin());
         saveButton.addEventListener('click', () => this.handleSave());
+        checkQuotaButton.addEventListener('click', () => this.handleCheckQuota());
     }
 
     private async handleLLMTypeChange(): Promise<void> {
@@ -272,6 +275,24 @@ class SettingsManager {
         }
     }
 
+    private async handleCheckQuota(): Promise<void> {
+        const { quotaDisplay } = this.elements;
+        try {
+            const appId = await StoreService.get<string>('appId');
+            const response = await APIService.checkQuota(appId);
+            if (response.status === 'ok') {
+                quotaDisplay.textContent = `Available credits: ${response.data.balance}`;
+                quotaDisplay.style.color = '#008000';
+            } else {
+                quotaDisplay.textContent = 'Error, maybe login first';
+                quotaDisplay.style.color = '#ff0000';
+            }
+        } catch (error) {
+            quotaDisplay.textContent = 'Error, maybe login first';
+            quotaDisplay.style.color = '#ff0000';
+        }
+    }
+
     async loadExistingSettings(): Promise<void> {
         const { llmTypeSelect, emailInput, ollamaUrl, apiKeyInput, systemPromptInput } = this.elements;
 
@@ -318,6 +339,8 @@ async function initializeUI(): Promise<void> {
         ollamaStatus: document.getElementById('ollamaStatus') as HTMLDivElement,
         apiKeyGroup: document.querySelector('.input-group:has(#apiKey)') as HTMLDivElement,
         pasteAISettings: document.getElementById('pasteAISettings') as HTMLDivElement,
+        checkQuotaButton: document.getElementById('checkQuotaButton') as HTMLButtonElement,
+        quotaDisplay: document.getElementById('quotaDisplay') as HTMLDivElement,
     };
 
     if (Object.values(elements).some(element => !element)) {
