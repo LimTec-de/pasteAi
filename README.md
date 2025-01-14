@@ -69,6 +69,13 @@ To run the application in development mode:
 pnpm tauri dev
 ```
 
+## Legal Information
+
+PasteAI is released under the GNU General Public License. For detailed legal information, please see:
+- [Legal Information](LEGAL.md) - Terms of service, privacy policy, and third-party licenses
+- [Imprint (Impressum)](https://www.limtec.de/#imprint) - Legal contact information
+- [OpenAI Terms](https://openai.com/policies/terms-of-use) - Terms for OpenAI API usage
+
 ## Imprint (Impressum)
 
 For legal information and contact details, please visit our [Imprint page](https://www.limtec.de/#imprint).
