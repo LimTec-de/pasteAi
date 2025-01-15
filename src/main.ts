@@ -29,6 +29,7 @@ import { fetch } from '@tauri-apps/plugin-http';
 interface AppConfig {
   MAX_TEXT_LENGTH: number;
   COPY_DETECTION_INTERVAL: number;
+  COPY_DETECTION_INTERVAL_MAX: number;
   COPY_THRESHOLD: number;
   APP_NAME: string;
 }
@@ -43,6 +44,7 @@ interface AppState {
   permissionGranted: boolean;
   autoUpdateDialogOpen: boolean;
   appId: string;
+  isOldCopy: boolean;
 }
 
 interface WindowConfig {
@@ -72,8 +74,9 @@ interface AppError extends Error {
 // Configuration
 const CONFIG: AppConfig = {
   MAX_TEXT_LENGTH: 300,
-  COPY_DETECTION_INTERVAL: 800,
-  COPY_THRESHOLD: 2,
+  COPY_DETECTION_INTERVAL: 100,
+  COPY_DETECTION_INTERVAL_MAX: 3000,
+  COPY_THRESHOLD: 3,
   APP_NAME: 'pasteAI'
 };
 
@@ -253,7 +256,20 @@ class LLMService {
 class ClipboardMonitor {
   static async initialize() {
     unlistenTextUpdate = await onTextUpdate(async (newText) => {
-      await this.handleTextUpdate(newText);
+      const currentTime = Date.now();
+      const lastCopy = currentTime - state.lastUpdateTime;
+
+      state.isOldCopy = currentTime - state.lastUpdateTime > CONFIG.COPY_DETECTION_INTERVAL_MAX;
+      if (currentTime > state.lastUpdateTime) {
+        state.lastUpdateTime = currentTime;
+      }
+
+      if (lastCopy < CONFIG.COPY_DETECTION_INTERVAL) {
+        console.log('Copy to fast! ' + (lastCopy));
+      } else {
+        console.log('Copy ' + (lastCopy));
+        await this.handleTextUpdate(newText);
+      }
     });
 
     unlistenClipboard = await startListening();
@@ -261,15 +277,12 @@ class ClipboardMonitor {
 
   private static async handleTextUpdate(newText: string) {
 
-    const currentTime = Date.now();
-    //const timeDiff = currentTime - state.lastUpdateTime;
-
     if (this.shouldSkipImprovement(newText)) {
       await this.handleSkippedImprovement();
       return;
     }
 
-    await this.updateClipboardState(newText, currentTime);
+    await this.updateClipboardState(newText);
 
     if (this.shouldImproveText(newText)) {
       if (newText.length > CONFIG.MAX_TEXT_LENGTH) {
@@ -278,6 +291,9 @@ class ClipboardMonitor {
       } else {
         await this.improveAndUpdateClipboard(newText);
       }
+    } else {
+      console.log(`Skipping improvement`);
+      console.log(`----------------------------------------------------------------------`);
     }
   }
 
@@ -291,16 +307,24 @@ class ClipboardMonitor {
     }
   }
 
-  private static async updateClipboardState(newText: string, currentTime: number) {
-    const isRecentCopy = currentTime - state.lastUpdateTime < CONFIG.COPY_DETECTION_INTERVAL;
+  private static async updateClipboardState(newText: string) {
 
-    if (newText === state.clipboardContent && isRecentCopy) {
-      state.copyCount++;
+    if (newText === state.clipboardContent) {
+
+      if (state.isOldCopy) {
+        console.log(`Old copy detected`);
+        state.copyCount = 1;
+      } else {
+        state.copyCount++;
+        console.log('copyCount++')
+      }
+
     } else {
       state.copyCount = 1;
     }
 
-    state.lastUpdateTime = currentTime;
+    console.log(`Copy count = ${state.copyCount}, isOldCopy = ${state.isOldCopy}`);
+
     state.clipboardContent = newText;
   }
 
@@ -337,7 +361,34 @@ class TrayManager {
       tooltip: CONFIG.APP_NAME,
       menu: this.currentMenu,
       menuOnLeftClick: true,
-      icon: await defaultWindowIcon() ?? ''
+      icon: await defaultWindowIcon() ?? '',
+      action: (event: any) => {
+        switch (event.type) {
+          case 'Click':
+            console.log(
+              `mouse ${event.button} button pressed, state: ${event.buttonState}`
+            );
+            break;
+          case 'DoubleClick':
+            console.log(`mouse ${event.button} button pressed`);
+            break;
+          case 'Enter':
+            console.log(
+              `mouse hovered tray at ${event.rect.position.x}, ${event.rect.position.y}`
+            );
+            break;
+          case 'Move':
+            console.log(
+              `mouse moved on tray at ${event.rect.position.x}, ${event.rect.position.y}`
+            );
+            break;
+          case 'Leave':
+            console.log(
+              `mouse left tray at ${event.rect.position.x}, ${event.rect.position.y}`
+            );
+            break;
+        }
+      }
     };
 
     await TrayIcon.new(options);
