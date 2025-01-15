@@ -77,13 +77,12 @@ export class StatusWindow {
         if (this.hideTimeout) {
             clearTimeout(this.hideTimeout);
         }
-
         this.hideTimeout = setTimeout(async () => {
             const element = document.getElementById('status-message');
             if (element) {
                 element.style.display = 'none';
             }
             await mainWindow.hide();
-        }, 2000);
+        }, type === StatusType.ERROR ? 10000 : 1000);
     }
 } 
