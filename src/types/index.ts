@@ -9,19 +9,6 @@ export interface AppConfig {
     APP_NAME: string;
 }
 
-export interface AppState {
-    clipboardContent: string;
-    lastUpdateTime: number;
-    lastImprovedContent: string;
-    lastNotImprovedContent: string;
-    copyCount: number;
-    monitorRunning: boolean;
-    permissionGranted: boolean;
-    autoUpdateDialogOpen: boolean;
-    appId: string;
-    isOldCopy: boolean;
-}
-
 export interface WindowConfig {
     settings: {
         width: number;
@@ -55,4 +42,5 @@ export interface Services {
     store?: Awaited<ReturnType<typeof import('@tauri-apps/plugin-store').load>>;
     unlistenTextUpdate?: UnlistenFn;
     unlistenClipboard?: () => Promise<void>;
+    appId?: string;
 } 

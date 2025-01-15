@@ -75,12 +75,13 @@ export class LLMService {
     }
 
     private static async improveWithPasteAI(text: string, systemPrompt: string, services: Services): Promise<string> {
-        const appId = await services.store?.get('appId') as string;
+        if (!services.appId) throw new Error('App ID not initialized');
+
         const formData = new FormData();
         formData.append('prompt', systemPrompt);
         formData.append('text', text);
 
-        const response = await fetch(`https://api.pasteai.app/improve/${appId}`, {
+        const response = await fetch(`https://api.pasteai.app/improve/${services.appId}`, {
             method: 'POST',
             body: formData
         });

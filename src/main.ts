@@ -5,6 +5,7 @@ import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notif
 import { listen } from '@tauri-apps/api/event';
 import { CONFIG } from './config';
 import { AppError, Services } from './types';
+import { invoke } from '@tauri-apps/api/core';
 import {
   LLMService,
   WindowManager,
@@ -20,13 +21,8 @@ const services: Services = {};
 async function initializeApp() {
   services.store = await load('pastai.json', { autoSave: false });
 
-  // Initialize app ID
-  const appId = await services.store.get('appId') as string;
-  if (!appId) {
-    const newAppId = crypto.randomUUID();
-    await services.store.set('appId', newAppId);
-    await services.store.save();
-  }
+  // Get system unique ID
+  services.appId = await invoke('get_unique_id') as string;
 
   // Initialize notifications
   const permissionGranted = await isPermissionGranted();

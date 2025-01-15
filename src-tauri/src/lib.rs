@@ -3,6 +3,12 @@ use std::process::exit;
 use tauri::AppHandle;
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_store::StoreExt;
+use machine_uid;
+
+#[tauri::command]
+fn get_unique_id() -> String {
+    machine_uid::get().unwrap()  // Returns system's unique ID
+}
 
 #[tauri::command]
 fn get_system_prompt_from_settings(app: AppHandle) -> String {
@@ -58,7 +64,8 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![
             get_system_prompt_from_settings,
-            set_system_prompt_from_settings
+            set_system_prompt_from_settings,
+            get_unique_id
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -2641,6 +2641,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "machine-uid"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c4506fa0abb0a2ea93f5862f55973da0a662d2ad0e98f337a1c5aac657f0892"
+dependencies = [
+ "libc",
+ "winreg 0.52.0",
+]
+
+[[package]]
 name = "malloc_buf"
 version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3288,6 +3298,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 name = "pasteAI"
 version = "0.8.0"
 dependencies = [
+ "machine-uid",
  "serde",
  "serde_json",
  "tauri",

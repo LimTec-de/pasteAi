@@ -30,6 +30,7 @@ tauri-plugin-notification = "2"
 #https://crosscopy.github.io/tauri-plugin-clipboard/
 tauri-plugin-clipboard = "2"
 tauri-plugin-http = "2"
+machine-uid = "0.5.3"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
