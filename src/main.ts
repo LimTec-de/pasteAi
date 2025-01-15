@@ -348,15 +348,18 @@ class ClipboardMonitor {
     state.lastNotImprovedContent = newText;
 
     try {
-      await StatusWindow.display('Starting to improve sentence');
+      await StatusWindow.display('Starting to improve sentence', StatusType.WORKING);
 
       state.lastImprovedContent = await LLMService.improveSentence(newText);
       await clipboard.writeText(state.lastImprovedContent);
 
-      await StatusWindow.display('Improved sentence ready');
+      await StatusWindow.display('Improved sentence ready', StatusType.OK);
     } catch (error) {
       console.error("Error improving sentence:", error);
-      await notify(CONFIG.APP_NAME, `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`);
+      await StatusWindow.display(
+        `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
+        StatusType.ERROR
+      );
     }
   }
 }
@@ -380,7 +383,7 @@ class TrayManager {
             console.log(
               `mouse ${event.button} button pressed, state: ${event.buttonState}`
             );
-            StatusWindow.display('Starting to improve sentence');
+            StatusWindow.display('Starting to improve sentence', StatusType.WORKING);
             break;
           case 'DoubleClick':
             console.log(`mouse ${event.button} button pressed`);
@@ -513,11 +516,19 @@ class UpdateManager {
   }
 }
 
+// Status types
+enum StatusType {
+  ERROR = 'error',
+  OK = 'ok',
+  WORKING = 'working',
+  INFO = 'info'
+}
+
 // Status Window Manager
 class StatusWindow {
   private static hideTimeout: number | null = null;
 
-  static async display(message: string) {
+  static async display(message: string, type: StatusType = StatusType.INFO) {
     const mainWindow = Window.getCurrent();
     if (!mainWindow) return;
 
@@ -528,9 +539,10 @@ class StatusWindow {
     const statusElement = document.getElementById('status-message');
     if (!statusElement) return;
 
-    // Update content
+    // Update content and status type
     statusElement.textContent = message;
     statusElement.style.display = 'block';
+    statusElement.className = `status-${type}`;
 
     // Give the browser a moment to calculate the new size
     await new Promise(resolve => setTimeout(resolve, 50));
