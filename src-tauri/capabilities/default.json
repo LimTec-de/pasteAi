@@ -54,6 +54,7 @@
     "autostart:allow-enable",
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
-    "core:window:allow-hide"
+    "core:window:allow-hide",
+    "core:window:allow-set-size"
   ]
 }

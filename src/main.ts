@@ -24,6 +24,7 @@ import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { fetch } from '@tauri-apps/plugin-http';
+import { LogicalSize } from '@tauri-apps/api/window';
 
 // Types and Interfaces
 interface AppConfig {
@@ -63,6 +64,11 @@ interface WindowConfig {
     height: number;
     title: string;
   };
+  status: {
+    width: number;
+    height: number;
+    title: string;
+  };
 }
 
 // Error type definition
@@ -95,6 +101,11 @@ const WINDOW_CONFIG: WindowConfig = {
     width: 700,
     height: 900,
     title: CONFIG.APP_NAME
+  },
+  status: {
+    width: 300,
+    height: 50,
+    title: 'Status'
   }
 };
 
@@ -113,7 +124,8 @@ const state: AppState = {
   monitorRunning: false,
   permissionGranted: false,
   autoUpdateDialogOpen: false,
-  appId: ""
+  appId: "",
+  isOldCopy: true
 };
 
 // Notification utilities
@@ -336,12 +348,12 @@ class ClipboardMonitor {
     state.lastNotImprovedContent = newText;
 
     try {
-      await notify(CONFIG.APP_NAME, 'Starting to improve sentence');
+      await StatusWindow.display('Starting to improve sentence');
 
       state.lastImprovedContent = await LLMService.improveSentence(newText);
       await clipboard.writeText(state.lastImprovedContent);
 
-      await notify(CONFIG.APP_NAME, 'Improved sentence ready');
+      await StatusWindow.display('Improved sentence ready');
     } catch (error) {
       console.error("Error improving sentence:", error);
       await notify(CONFIG.APP_NAME, `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`);
@@ -368,6 +380,7 @@ class TrayManager {
             console.log(
               `mouse ${event.button} button pressed, state: ${event.buttonState}`
             );
+            StatusWindow.display('Starting to improve sentence');
             break;
           case 'DoubleClick':
             console.log(`mouse ${event.button} button pressed`);
@@ -500,6 +513,53 @@ class UpdateManager {
   }
 }
 
+// Status Window Manager
+class StatusWindow {
+  private static hideTimeout: number | null = null;
+
+  static async display(message: string) {
+    const mainWindow = Window.getCurrent();
+    if (!mainWindow) return;
+
+    // Show window and update message
+    await mainWindow.show();
+
+    // Update the message directly
+    const statusElement = document.getElementById('status-message');
+    if (!statusElement) return;
+
+    // Update content
+    statusElement.textContent = message;
+    statusElement.style.display = 'block';
+
+    // Give the browser a moment to calculate the new size
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // Get the actual size of the status message
+    const rect = statusElement.getBoundingClientRect();
+    const padding = 40; // Extra padding for the window
+
+    // Update window size to fit content using LogicalSize
+    const newSize = new LogicalSize(
+      Math.min(Math.max(rect.width + padding, 300), 800),
+      Math.min(rect.height + padding, 400)
+    );
+    await mainWindow.setSize(newSize);
+
+    // Reset the auto-hide timer
+    if (this.hideTimeout) {
+      clearTimeout(this.hideTimeout);
+    }
+
+    this.hideTimeout = setTimeout(async () => {
+      const element = document.getElementById('status-message');
+      if (element) {
+        element.style.display = 'none';
+      }
+      await mainWindow.hide();
+    }, 2000);
+  }
+}
 
 // Application initialization
 async function initializeApp() {

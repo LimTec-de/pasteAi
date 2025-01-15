@@ -4,9 +4,30 @@
 <head>
   <title>Tauri App</title>
   <script type="module" src="/src/main.ts" defer></script>
+  <style>
+    #status-message {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      padding: 15px 25px;
+      background-color: rgba(0, 0, 0, 0.8);
+      color: white;
+      font-family: system-ui, -apple-system, sans-serif;
+      border-radius: 8px;
+      min-width: 300px;
+      max-width: 800px;
+      font-size: 16px;
+      line-height: 1.5;
+      display: none;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+  </style>
 </head>
 
 <body>
+  <div id="status-message"></div>
 </body>
 
 </html>
