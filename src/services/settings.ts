@@ -167,7 +167,7 @@ export class SettingsManager {
     }
 
     async loadExistingSettings(): Promise<void> {
-        const { llmTypeSelect, ollamaUrl, apiKeyInput, systemPromptInput } = this.elements;
+        const { llmTypeSelect, ollamaUrl, apiKeyInput, systemPromptInput, emailInput } = this.elements;
 
         const llmType = await SettingsStore.get<string>('llm_type') || 'pasteai';
         llmTypeSelect.value = llmType;
@@ -176,6 +176,7 @@ export class SettingsManager {
         ollamaUrl.value = await SettingsStore.get<string>('ollama_url') || 'http://localhost:11434';
         apiKeyInput.value = await SettingsStore.get<string>('openai_api_key') || '';
         systemPromptInput.value = await invoke('get_system_prompt_from_settings') as string;
+        emailInput.value = await SettingsStore.get<string>('email') || '';
 
         if (llmType === 'ollama') {
             const isAvailable = await SettingsAPIService.checkOllamaAvailability(ollamaUrl.value);
