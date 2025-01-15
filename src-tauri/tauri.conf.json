@@ -26,7 +26,7 @@
         "label": "main",
         "title": "pasteAI",
         "width": 10,
-        "height": 500,
+        "height": 10,
         "visible": false,
         "skipTaskbar": true,
         "transparent": true,
