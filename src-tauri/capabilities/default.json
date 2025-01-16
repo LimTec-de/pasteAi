@@ -15,6 +15,9 @@
         },
         {
           "url": "http://*:*"
+        },
+        {
+          "url": "http://localhost:*"
         }
       ]
     },
