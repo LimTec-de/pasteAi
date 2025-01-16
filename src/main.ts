@@ -22,7 +22,14 @@ async function initializeApp() {
   services.store = await load('pastai.json', { autoSave: false });
 
   // Get system unique ID
-  services.appId = await invoke('get_unique_id') as string;
+  // Initialize app ID
+  // Try to get existing app ID from store, or generate a new one if not found
+  services.appId = await services.store.get('appId') as string;
+  if (!services.appId) {
+    services.appId = crypto.randomUUID();
+    await services.store.set('appId', services.appId);
+    await services.store.save();
+  }
 
   // Initialize notifications
   const permissionGranted = await isPermissionGranted();

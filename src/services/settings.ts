@@ -95,7 +95,7 @@ export class SettingsManager {
         this.ui.updateLoginMessage('Sending verification email...', false);
 
         try {
-            const appId = await invoke('get_unique_id') as string;
+            const appId = await SettingsStore.get<string>('appId');
             await SettingsStore.set('email', email);
             await SettingsStore.set('llm_type', llmTypeSelect.value);
             await SettingsStore.save();
@@ -152,7 +152,7 @@ export class SettingsManager {
         const { quotaDisplay } = this.elements;
 
         try {
-            const appId = await invoke('get_unique_id') as string;
+            const appId = await SettingsStore.get<string>('appId');
             const response = await SettingsAPIService.checkQuota(appId);
 
             if (response.status === 'ok') {
