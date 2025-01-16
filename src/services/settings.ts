@@ -150,7 +150,7 @@ export class SettingsManager {
     }
 
     private async handleCheckQuota(): Promise<void> {
-        const { quotaDisplay } = this.elements;
+        const { quotaDisplay, emailInput, loginButton, loginMessage } = this.elements;
         quotaDisplay.style.display = 'none'; // Reset display state
 
         try {
@@ -166,8 +166,31 @@ export class SettingsManager {
             console.log('Quota response:', response); // Add logging
 
             if (response.status === 'ok') {
-                quotaDisplay.textContent = `Balance: ${response.data.balance} tokens`;
+                quotaDisplay.textContent = `Balance: ${response.data.balance}${response.data.email ? '' : ' free'} tokens`;
                 quotaDisplay.style.display = 'block';
+
+                // Update email-related UI
+                if (response.data.email) {
+                    // Hide email input container and login button
+                    const emailContainer = emailInput.closest('div[style*="display: flex"]') as HTMLElement;
+                    if (emailContainer) emailContainer.style.display = 'none';
+                    const emailLabel = emailInput.closest('.input-group')?.querySelector('label') as HTMLElement;
+                    if (emailLabel) emailLabel.style.display = 'none';
+                    loginButton.style.display = 'none';
+                    // Show login status
+                    loginMessage.style.display = 'block';
+                    loginMessage.style.color = '#008000';
+                    loginMessage.textContent = `Logged in via ${response.data.email}`;
+                } else {
+                    // Show email input container and login button
+                    const emailContainer = emailInput.closest('div[style*="display: flex"]') as HTMLElement;
+                    if (emailContainer) emailContainer.style.display = 'flex';
+                    const emailLabel = emailInput.closest('.input-group')?.querySelector('label') as HTMLElement;
+                    if (emailLabel) emailLabel.style.display = 'block';
+                    emailInput.disabled = false;
+                    loginButton.style.display = 'block';
+                    loginMessage.style.display = 'none';
+                }
             } else {
                 quotaDisplay.textContent = 'Error checking quota';
                 quotaDisplay.style.display = 'block';

@@ -22,7 +22,7 @@ export class SettingsAPIService {
         }
     }
 
-    static async checkQuota(appId: string): Promise<{ status: string; data: { balance: number } }> {
+    static async checkQuota(appId: string): Promise<{ status: string; data: { balance: number; email: string | null } }> {
         const response = await fetch(`https://api.pasteai.app/quota/${appId}`);
         return response.json();
     }
