@@ -3296,7 +3296,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pasteAI"
-version = "0.8.4"
+version = "0.8.5"
 dependencies = [
  "machine-uid",
  "serde",
