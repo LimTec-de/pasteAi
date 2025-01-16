@@ -1,4 +1,33 @@
-import { AppConfig, WindowConfig } from '../types';
+export interface AppConfig {
+    MAX_TEXT_LENGTH: number;
+    COPY_DETECTION_INTERVAL: number;
+    COPY_DETECTION_INTERVAL_MAX: number;
+    COPY_THRESHOLD: number;
+    APP_NAME: string;
+}
+
+export interface WindowConfig {
+    settings: {
+        width: number;
+        height: number;
+        title: string;
+    };
+    about: {
+        width: number;
+        height: number;
+        title: string;
+    };
+    start: {
+        width: number;
+        height: number;
+        title: string;
+    };
+    status: {
+        width: number;
+        height: number;
+        title: string;
+    };
+}
 
 export const CONFIG: AppConfig = {
     MAX_TEXT_LENGTH: 300,

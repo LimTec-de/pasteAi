@@ -1,5 +1,4 @@
-import { AboutService } from './services/about';
-import { getUIElements } from './utils/about-ui';
+import { getUIElements, AboutService } from './services/about';
 
 async function initializeUI() {
     const elements = getUIElements();

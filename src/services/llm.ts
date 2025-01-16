@@ -1,9 +1,9 @@
 import OpenAI from 'openai';
 import { invoke } from '@tauri-apps/api/core';
 import { fetch } from '@tauri-apps/plugin-http';
-import { Services } from '../types';
-import { notify } from '../utils';
 import { CONFIG } from '../config';
+import { NotificationService } from './notifications';
+import { Services } from '.';
 
 export class LLMService {
     static async initialize(services: Services) {
@@ -90,7 +90,7 @@ export class LLMService {
 
         if (data.status === 'ok') {
             if (data.data.balance < 3) {
-                await notify(CONFIG.APP_NAME, 'Almost out of balance, please recharge via https://pasteai.app');
+                await NotificationService.notify(CONFIG.APP_NAME, 'Almost out of balance, please recharge via https://pasteai.app');
             }
             return data.data.response || text;
         }

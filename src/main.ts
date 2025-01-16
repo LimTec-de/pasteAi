@@ -4,7 +4,8 @@ import { message } from '@tauri-apps/plugin-dialog';
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { listen } from '@tauri-apps/api/event';
 import { CONFIG } from './config';
-import { AppError, Services } from './types';
+import { AppError } from './app-types';
+import { Services } from './services';
 import { invoke } from '@tauri-apps/api/core';
 import {
   LLMService,

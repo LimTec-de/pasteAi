@@ -3,7 +3,7 @@ import { message, confirm } from '@tauri-apps/plugin-dialog';
 import { Window } from '@tauri-apps/api/window';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { CONFIG } from '../config';
-import { notify } from '../utils';
+import { NotificationService } from './notifications';
 
 export class UpdateManager {
     static async checkUpdate(shouldNotify: boolean) {
@@ -38,7 +38,7 @@ export class UpdateManager {
                 });
                 (await Window.getByLabel('main'))?.hide();
             } else {
-                await notify(CONFIG.APP_NAME, 'Error checking for updates');
+                await NotificationService.notify(CONFIG.APP_NAME, 'Error checking for updates');
             }
         }
     }

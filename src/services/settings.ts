@@ -2,30 +2,29 @@ import { Command } from '@tauri-apps/plugin-shell';
 import { emit } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import { Window } from '@tauri-apps/api/window';
-import { UIElements, LLMType } from '../types/settings';
+import { SettingsUIElements, LLMType } from './settings-ui';
 import { SettingsUIManager } from './settings-ui';
 import { SettingsAPIService } from './settings-api';
 import { SettingsStore } from './settings-store';
 
 export class SettingsManager {
     private ui: SettingsUIManager;
-    private elements: UIElements;
+    private elements: SettingsUIElements;
 
-    constructor(elements: UIElements) {
+    constructor(elements: SettingsUIElements) {
         this.elements = elements;
         this.ui = new SettingsUIManager(elements);
         this.initializeEventListeners();
     }
 
     private async initializeEventListeners(): Promise<void> {
-        const { llmTypeSelect, ollamaUrl, installPhiButton, loginButton, saveButton, checkQuotaButton } = this.elements;
+        const { llmTypeSelect, ollamaUrl, installPhiButton, loginButton, saveButton } = this.elements;
 
         llmTypeSelect.addEventListener('change', () => this.handleLLMTypeChange());
         ollamaUrl.addEventListener('change', () => this.handleLLMTypeChange());
         installPhiButton.addEventListener('click', () => this.handlePhiInstall());
         loginButton.addEventListener('click', () => this.handleLogin());
         saveButton.addEventListener('click', () => this.handleSave());
-        checkQuotaButton.addEventListener('click', () => this.handleCheckQuota());
     }
 
     private async handleLLMTypeChange(): Promise<void> {
@@ -41,6 +40,8 @@ export class SettingsManager {
                 const models = await SettingsAPIService.fetchOllamaModels(ollamaUrl.value);
                 await this.ui.updateModelList(models);
             }
+        } else if (llmTypeSelect.value === 'pasteai') {
+            await this.handleCheckQuota();
         }
     }
 
@@ -150,13 +151,25 @@ export class SettingsManager {
 
     private async handleCheckQuota(): Promise<void> {
         const { quotaDisplay } = this.elements;
+        quotaDisplay.style.display = 'none'; // Reset display state
 
         try {
             const appId = await SettingsStore.get<string>('appId');
+            if (!appId) {
+                console.error('No appId found');
+                quotaDisplay.textContent = 'Error: No app ID found';
+                quotaDisplay.style.display = 'block';
+                return;
+            }
+
             const response = await SettingsAPIService.checkQuota(appId);
+            console.log('Quota response:', response); // Add logging
 
             if (response.status === 'ok') {
                 quotaDisplay.textContent = `Balance: ${response.data.balance} tokens`;
+                quotaDisplay.style.display = 'block';
+            } else {
+                quotaDisplay.textContent = 'Error checking quota';
                 quotaDisplay.style.display = 'block';
             }
         } catch (error) {
@@ -186,6 +199,8 @@ export class SettingsManager {
                 const models = await SettingsAPIService.fetchOllamaModels(ollamaUrl.value);
                 await this.ui.updateModelList(models);
             }
+        } else if (llmType === 'pasteai') {
+            await this.handleCheckQuota();
         }
     }
 } 

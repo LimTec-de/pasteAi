@@ -1,7 +1,20 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { check } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
-import { UIElements } from '../types/about';
+
+export interface AboutUIElements {
+    version: HTMLElement | null;
+    checkingUpdates: HTMLElement | null;
+    installUpdate: HTMLButtonElement | null;
+}
+
+export function getUIElements(): AboutUIElements {
+    return {
+        version: document.getElementById('version'),
+        checkingUpdates: document.getElementById('checkingUpdates'),
+        installUpdate: document.getElementById('installUpdate') as HTMLButtonElement | null
+    };
+}
 
 export class AboutService {
     static async displayVersion(versionElement: HTMLElement | null) {
@@ -10,7 +23,7 @@ export class AboutService {
         versionElement.textContent = `Version: ${version}`;
     }
 
-    static async handleUpdate(elements: UIElements) {
+    static async handleUpdate(elements: AboutUIElements) {
         const { checkingUpdates, installUpdate } = elements;
 
         try {
@@ -38,7 +51,7 @@ export class AboutService {
         }
     }
 
-    private static async handleInstallation(update: any, elements: UIElements) {
+    private static async handleInstallation(update: any, elements: AboutUIElements) {
         const { installUpdate, checkingUpdates } = elements;
 
         if (!installUpdate) return;

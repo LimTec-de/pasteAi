@@ -1,7 +1,7 @@
 import { onTextUpdate, startListening } from "tauri-plugin-clipboard-api";
 import clipboard from "tauri-plugin-clipboard-api";
 import { CONFIG } from '../config';
-import { Services } from '../types';
+import { Services } from '.';
 import { LLMService, StatusWindow, StatusType } from '.';
 
 interface ClipboardState {

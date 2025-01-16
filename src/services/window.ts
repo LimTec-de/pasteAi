@@ -1,8 +1,7 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { Window } from '@tauri-apps/api/window';
 import { LogicalSize } from '@tauri-apps/api/window';
-import { WINDOW_CONFIG } from '../config';
-import type { WindowConfig } from '../types';
+import { WINDOW_CONFIG, WindowConfig } from '../config';
 
 export class WindowManager {
     static async createWindow(type: keyof WindowConfig, url: string) {

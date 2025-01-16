@@ -1,6 +1,6 @@
 import { SettingsManager } from './services/settings';
 import { SettingsStore } from './services/settings-store';
-import { getUIElements } from './utils/settings-ui';
+import { getUIElements } from './services/settings-ui';
 
 async function initializeUI(): Promise<void> {
     try {
