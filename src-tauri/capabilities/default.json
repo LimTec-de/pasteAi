@@ -11,7 +11,10 @@
       "identifier": "http:default",
       "allow": [
         {
-          "url": "https://api.pasteai.app"
+          "url": "https://*"
+        },
+        {
+          "url": "http://*"
         }
       ]
     },
