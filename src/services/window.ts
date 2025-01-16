@@ -58,7 +58,7 @@ export class StatusWindow {
         const statusElement = document.getElementById('status-message');
         if (!statusElement) return;
 
-        statusElement.textContent = message;
+        statusElement.innerHTML = message;
         statusElement.style.display = 'block';
         statusElement.className = `status-${type}`;
 

@@ -108,10 +108,20 @@ export class ClipboardMonitor {
             await StatusWindow.display('Improved sentence ready', StatusType.OK);
         } catch (error) {
             console.error("Error improving sentence:", error);
-            await StatusWindow.display(
-                `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
-                StatusType.ERROR
-            );
+
+            // Check if it's a quota error
+            const pasteAIError = error as Error & { data?: { type: string } };
+            if (pasteAIError.data?.type === 'quota') {
+                await StatusWindow.display(
+                    'No tokens left! <a href="https://pasteai.app/tokens.html" target="_blank">Click here to recharge</a>',
+                    StatusType.ERROR
+                );
+            } else {
+                await StatusWindow.display(
+                    `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
+                    StatusType.ERROR
+                );
+            }
         }
     }
 } 

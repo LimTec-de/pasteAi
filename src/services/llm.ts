@@ -5,6 +5,24 @@ import { CONFIG } from '../config';
 import { NotificationService } from './notifications';
 import { Services } from '.';
 
+interface PasteAIErrorResponse {
+    status: 'error';
+    data: {
+        type: 'quota' | 'error';
+        message: string;
+    };
+}
+
+interface PasteAISuccessResponse {
+    status: 'ok';
+    data: {
+        response: string;
+        balance: number;
+    };
+}
+
+type PasteAIResponse = PasteAISuccessResponse | PasteAIErrorResponse;
+
 export class LLMService {
     static async initialize(services: Services) {
         const llmType = await services.store?.get('llm_type') as string;
@@ -86,7 +104,7 @@ export class LLMService {
             body: formData
         });
 
-        const data = await response.json();
+        const data = await response.json() as PasteAIResponse;
 
         if (data.status === 'ok') {
             if (data.data.balance < 3) {
@@ -95,8 +113,8 @@ export class LLMService {
             return data.data.response || text;
         }
 
-
-
-        throw new Error(data.data.message || 'An error occurred');
+        const error = new Error(data.data.message || 'An error occurred');
+        (error as any).data = data.data;
+        throw error;
     }
 } 
