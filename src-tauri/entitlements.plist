@@ -13,5 +13,6 @@
     <!-- Allow access to Application Support directory for storing settings -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
+    
   </dict>
 </plist>

@@ -12,7 +12,6 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNGOTMzNTI3QUNFRjg5REQKUldUZGllK3NKeldUUDZhL0dFRER3Q2NWVm45dk9lOU9QT0dhTHVwNExHVm15STI0Um5zdDZ3VmIK",
-      "dialog": true,
       "endpoints": [
         "https://github.com/LimTec-de/pasteAi/releases/latest/download/latest.json"
       ]
