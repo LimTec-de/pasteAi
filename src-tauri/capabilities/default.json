@@ -55,6 +55,7 @@
     "autostart:allow-disable",
     "autostart:allow-is-enabled",
     "core:window:allow-hide",
-    "core:window:allow-set-size"
+    "core:window:allow-set-size",
+    "updater:default"
   ]
 }
