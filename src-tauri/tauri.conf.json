@@ -15,12 +15,6 @@
       "endpoints": [
         "https://github.com/LimTec-de/pasteAi/releases/latest/download/latest.json"
       ]
-    },
-    "http": {
-      "all": false,
-      "scope": [
-        "http://localhost:11434/*"
-      ]
     }
   },
   "app": {

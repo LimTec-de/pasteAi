@@ -60,6 +60,8 @@
     "core:window:allow-hide",
     "core:window:allow-set-size",
     "updater:default",
-    "http:allow-fetch"
+    "http:allow-fetch",
+    "http:allow-fetch-send",
+    "http:allow-fetch-read-body"
   ]
 }
