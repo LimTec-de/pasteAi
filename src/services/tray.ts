@@ -6,6 +6,7 @@ import { exit } from '@tauri-apps/plugin-process';
 import { Window } from '@tauri-apps/api/window';
 import { CONFIG } from '../config';
 import { WindowManager, UpdateManager } from '.';
+import { fetch } from '@tauri-apps/plugin-http';
 
 export class TrayManager {
     private static currentMenu: Menu | null = null;
@@ -85,6 +86,15 @@ export class TrayManager {
                     id: 'debug',
                     text: 'Show debug window',
                     action: () => Window.getCurrent().show(),
+                },
+                {
+                    id: 'test',
+                    text: 'test',
+                    action: async () => {
+                        const response = await fetch(`http://localhost:11434/api/version`);
+                        console.log('aaaa');
+                        console.log(response);
+                    }
                 },
                 await PredefinedMenuItem.new({ item: 'Separator' }),
                 {
