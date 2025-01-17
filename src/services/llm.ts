@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 import { invoke } from '@tauri-apps/api/core';
-import { fetch } from '@tauri-apps/plugin-http';
+import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { CONFIG } from '../config';
 import { NotificationService } from './notifications';
 import { Services } from '.';
@@ -99,7 +99,7 @@ export class LLMService {
         formData.append('prompt', systemPrompt);
         formData.append('text', text);
 
-        const response = await fetch(`https://api.pasteai.app/improve/${services.appId}`, {
+        const response = await tauriFetch(`https://api.pasteai.app/improve/${services.appId}`, {
             method: 'POST',
             body: formData
         });
