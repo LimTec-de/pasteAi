@@ -8,7 +8,6 @@ export interface SettingsUIElements {
     saveButton: HTMLButtonElement;
     ollamaUrl: HTMLInputElement;
     modelSelect: HTMLSelectElement;
-    installPhiButton: HTMLButtonElement;
     llmTypeSelect: HTMLSelectElement;
     loginButton: HTMLButtonElement;
     loginMessage: HTMLDivElement;
@@ -28,7 +27,6 @@ export function getUIElements(): SettingsUIElements {
         saveButton: document.getElementById('saveButton') as HTMLButtonElement,
         ollamaUrl: document.getElementById('ollamaUrl') as HTMLInputElement,
         modelSelect: document.getElementById('ollamaModel') as HTMLSelectElement,
-        installPhiButton: document.getElementById('installPhi') as HTMLButtonElement,
         llmTypeSelect: document.getElementById('llmType') as HTMLSelectElement,
         loginButton: document.getElementById('loginButton') as HTMLButtonElement,
         loginMessage: document.getElementById('loginMessage') as HTMLDivElement,

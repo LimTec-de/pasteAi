@@ -18,25 +18,9 @@
         }
       ]
     },
-    {
-      "identifier": "shell:allow-spawn",
-      "allow": [
-        {
-          "name": "ollama",
-          "cmd": "ollama",
-          "args": [
-            "pull",
-            {
-              "validator": "[a-zA-Z0-9-_.:]+$"
-            }
-          ]
-        }
-      ]
-    },
     "core:default",
     "core:tray:default",
     "core:window:allow-close",
-    "shell:allow-open",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister",

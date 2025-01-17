@@ -41,7 +41,7 @@ export class LLMService {
     }
 
     static async improveSentence(text: string, services: Services): Promise<string> {
-        const llmType = await services.store?.get('llm_type') as string || 'openai';
+        const llmType = await services.store?.get('llm_type') as string || 'pasteai';
         const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
 
         try {
@@ -50,8 +50,10 @@ export class LLMService {
                     return await this.improveWithOllama(text, systemPrompt, services);
                 case 'openai':
                     return await this.improveWithOpenAI(text, systemPrompt, services);
-                default:
+                case 'pasteai':
                     return await this.improveWithPasteAI(text, systemPrompt, services);
+                default:
+                    throw new Error('Invalid LLM type');
             }
         } catch (error) {
             console.error(`Error improving text with ${llmType}:`, error);

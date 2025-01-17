@@ -18,11 +18,10 @@ export class SettingsManager {
     }
 
     private async initializeEventListeners(): Promise<void> {
-        const { llmTypeSelect, ollamaUrl, installPhiButton, loginButton, saveButton } = this.elements;
+        const { llmTypeSelect, ollamaUrl, loginButton, saveButton } = this.elements;
 
         llmTypeSelect.addEventListener('change', () => this.handleLLMTypeChange());
         ollamaUrl.addEventListener('change', () => this.handleLLMTypeChange());
-        installPhiButton.addEventListener('click', () => this.handlePhiInstall());
         loginButton.addEventListener('click', () => this.handleLogin());
         saveButton.addEventListener('click', () => this.handleSave());
     }
@@ -43,44 +42,6 @@ export class SettingsManager {
         } else if (llmTypeSelect.value === 'pasteai') {
             await this.handleCheckQuota();
         }
-    }
-
-    private async handlePhiInstall(): Promise<void> {
-        const { installPhiButton } = this.elements;
-        const outputPre = document.getElementById('installOutput') as HTMLPreElement;
-
-        installPhiButton.disabled = true;
-        outputPre.style.display = 'block';
-        outputPre.textContent = 'Installing phi:mini...\n';
-
-        try {
-            const command = Command.create('ollama', ['pull', 'phi3:mini']);
-            this.setupCommandListeners(command, outputPre, installPhiButton);
-            await command.spawn();
-        } catch (error) {
-            outputPre.textContent += `\nError: ${error}`;
-            installPhiButton.disabled = false;
-        }
-    }
-
-    private setupCommandListeners(command: any, outputPre: HTMLPreElement, button: HTMLButtonElement): void {
-        command.on('close', async ({ code }: { code: number }) => {
-            outputPre.textContent += code === 0 ? '\nInstallation complete!' : `\nProcess exited with code ${code}`;
-            button.disabled = false;
-            if (code === 0) await this.handleLLMTypeChange();
-        });
-
-        command.on('error', (error: Error) => {
-            outputPre.textContent += `\nError: ${error}`;
-            button.disabled = false;
-        });
-
-        ['stdout', 'stderr'].forEach(stream => {
-            command[stream].on('data', (line: string) => {
-                outputPre.textContent += line + '\n';
-                outputPre.scrollTop = outputPre.scrollHeight;
-            });
-        });
     }
 
     private async handleLogin(): Promise<void> {
