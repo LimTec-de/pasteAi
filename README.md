@@ -9,12 +9,12 @@ So basically you can use this app to make your text more readable by 3 times cop
 
 💾 [Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
 
-⚠️You need an OpenAI API key to use this app. You can get one [here](https://platform.openai.com/api-keys).
-Then open pasteAI settings via Tray Menu and paste your key then restart the app.
+⚠️ You can use some free tokens from our server. After this, you'll need to either purchase more tokens from [pasteai.app](https://pasteai.app) or provide your own OpenAI API key from [OpenAI's website](https://platform.openai.com/api-keys).
+Then open pasteAI settings via Tray Menu and paste your key.
 
 ## Features
 
-- Automatically detects double-copy clipboard operations
+- Automatically detects triple-copy clipboard operations
 - Optimizes text formatting instantly
 - Runs silently in the background
 - Cross-platform support
@@ -80,3 +80,4 @@ PasteAI is released under the GNU General Public License. For detailed legal inf
 
 For legal information and contact details, please visit our [Imprint page](https://www.limtec.de/#imprint).
 </rewritten_file>
+```
