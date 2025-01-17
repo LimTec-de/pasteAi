@@ -2,9 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
   <dict>
-    <!-- Allow outbound network access for API calls -->
-    <key>com.apple.security.network.client</key>
-    <true/>
 
     <!-- Enable App Sandbox -->
     <key>com.apple.security.app-sandbox</key>
@@ -13,6 +10,9 @@
     <!-- Allow access to Application Support directory for storing settings -->
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
-    
+
+    <!-- Allow outbound network access for API calls -->
+    <key>com.apple.security.network.client</key>
+    <true/>
   </dict>
 </plist>
