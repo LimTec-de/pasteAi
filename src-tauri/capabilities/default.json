@@ -15,9 +15,6 @@
         },
         {
           "url": "http://*:*"
-        },
-        {
-          "url": "http://localhost:*"
         }
       ]
     },
@@ -62,6 +59,7 @@
     "autostart:allow-is-enabled",
     "core:window:allow-hide",
     "core:window:allow-set-size",
-    "updater:default"
+    "updater:default",
+    "http:allow-fetch"
   ]
 }

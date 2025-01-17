@@ -14,5 +14,9 @@
     <!-- Allow outbound network access for API calls -->
     <key>com.apple.security.network.client</key>
     <true/>
+
+    <!-- Allow local network access -->
+    <key>com.apple.security.network.client.local</key>
+    <true/>
   </dict>
 </plist>
