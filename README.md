@@ -46,12 +46,6 @@ Before building the application, ensure you have the following installed:
 
    The compiled application will be available in the `src-tauri/target/release` directory.
 
-4. ⚠️ **macOS Users**: Remove the quarantine attribute to run it:
-   ```bash
-   xattr -d com.apple.quarantine /Applications/pasteAI.app
-   ```
-
-   This step is necessary because the app is not signed (right now) and macOS may prevent it from starting.
 
 ## Usage
 
