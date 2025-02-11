@@ -3,6 +3,8 @@ import clipboard from "tauri-plugin-clipboard-api";
 import { CONFIG } from '../config';
 import { Services } from '.';
 import { LLMService, StatusWindow, StatusType } from '.';
+import { confirm } from '@tauri-apps/plugin-dialog';
+import { Window } from '@tauri-apps/api/window';
 
 interface ClipboardState {
     clipboardContent: string;
@@ -100,6 +102,29 @@ export class ClipboardMonitor {
         this.state.lastNotImprovedContent = newText;
 
         try {
+            // Check for API consent
+            const hasConsent = await services.store?.get('hasConsent') as boolean;
+
+            if (!hasConsent) {
+                const consent = await confirm(
+                    'To improve your text, we need to send it to the AI service you have defined in settings. ' +
+                    'Do you agree to this?',
+                    {
+                        title: CONFIG.APP_NAME,
+                        kind: 'warning'
+                    }
+                );
+                (await Window.getByLabel('main'))?.hide();
+
+                if (!consent) {
+                    await StatusWindow.display('Text improvement cancelled', StatusType.INFO);
+                    return;
+                } else {
+                    await services.store?.set('hasConsent', true);
+                    await services.store?.save();
+                }
+            }
+
             await StatusWindow.display('Starting to improve sentence', StatusType.WORKING);
 
             this.state.lastImprovedContent = await LLMService.improveSentence(newText, services);
@@ -109,7 +134,6 @@ export class ClipboardMonitor {
         } catch (error) {
             console.error("Error improving sentence:", error);
 
-            // Check if it's a quota error
             const pasteAIError = error as Error & { data?: { type: string } };
             if (pasteAIError.data?.type === 'quota') {
                 await StatusWindow.display(

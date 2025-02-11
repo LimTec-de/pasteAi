@@ -28,8 +28,8 @@ async function initializeApp() {
   services.appId = await services.store.get('appId') as string;
   if (!services.appId) {
     services.appId = crypto.randomUUID();
-    await services.store.set('appId', services.appId);
-    await services.store.save();
+    await services.store?.set('appId', services.appId);
+    await services.store?.save();
   }
 
   // Initialize notifications
