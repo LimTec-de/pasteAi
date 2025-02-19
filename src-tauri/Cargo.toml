@@ -1,9 +1,9 @@
 [package]
 name = "pasteAI"
-version = "0.8.10"
-description = "A Tauri App"
-authors = ["you"]
-edition = "2021"
+version = "0.8.11"
+description = "AI powered clipboard improvement tool"
+authors = ["Sebastian Igerl"]
+edition = "2025"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
