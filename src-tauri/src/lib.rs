@@ -1,6 +1,4 @@
-use serde_json::json;
 use std::process::exit;
-use tauri::AppHandle;
 use tauri_plugin_autostart::MacosLauncher;
 use tauri_plugin_store::StoreExt;
 
