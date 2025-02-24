@@ -1,11 +1,13 @@
 import { SettingsManager } from './services/settings';
 import { SettingsStore } from './services/settings-store';
 import { getUIElements } from './services/settings-ui';
+import { PromptStore } from './services/prompt-store';
 
 async function initializeUI(): Promise<void> {
     try {
         console.log('Initializing settings UI...');
         await SettingsStore.initialize();
+        await PromptStore.initialize();
         console.log('Store initialized');
 
         const elements = getUIElements();

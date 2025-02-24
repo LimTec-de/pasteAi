@@ -1,11 +1,17 @@
 import { SettingsStore } from './settings-store';
+import { PromptStore } from './prompt-store';
+import { Window } from '@tauri-apps/api/window';
 
 export type LLMType = 'pasteai' | 'ollama' | 'openai';
 
+interface PromptEditorState {
+    isEditing: boolean;
+    editingPromptId: number | null;
+}
+
 export interface SettingsUIElements {
     apiKeyInput: HTMLInputElement;
-    systemPromptInput: HTMLTextAreaElement;
-    saveButton: HTMLButtonElement;
+    closeButton: HTMLButtonElement;
     ollamaUrl: HTMLInputElement;
     modelSelect: HTMLSelectElement;
     llmTypeSelect: HTMLSelectElement;
@@ -18,13 +24,20 @@ export interface SettingsUIElements {
     apiKeyGroup: HTMLDivElement;
     pasteAISettings: HTMLDivElement;
     quotaDisplay: HTMLDivElement;
+    // Prompt management elements
+    promptList: HTMLDivElement;
+    promptEditor: HTMLDivElement;
+    promptTitle: HTMLInputElement;
+    promptText: HTMLTextAreaElement;
+    addPromptButton: HTMLButtonElement;
+    savePromptButton: HTMLButtonElement;
+    cancelPromptButton: HTMLButtonElement;
 }
 
 export function getUIElements(): SettingsUIElements {
     const elements = {
         apiKeyInput: document.getElementById('apiKey') as HTMLInputElement,
-        systemPromptInput: document.getElementById('systemPrompt') as HTMLTextAreaElement,
-        saveButton: document.getElementById('saveButton') as HTMLButtonElement,
+        closeButton: document.getElementById('closeButton') as HTMLButtonElement,
         ollamaUrl: document.getElementById('ollamaUrl') as HTMLInputElement,
         modelSelect: document.getElementById('ollamaModel') as HTMLSelectElement,
         llmTypeSelect: document.getElementById('llmType') as HTMLSelectElement,
@@ -36,7 +49,15 @@ export function getUIElements(): SettingsUIElements {
         ollamaStatus: document.getElementById('ollamaStatus') as HTMLDivElement,
         apiKeyGroup: document.querySelector('.input-group:has(#apiKey)') as HTMLDivElement,
         pasteAISettings: document.getElementById('pasteAISettings') as HTMLDivElement,
-        quotaDisplay: document.getElementById('quotaDisplay') as HTMLDivElement
+        quotaDisplay: document.getElementById('quotaDisplay') as HTMLDivElement,
+        // Prompt management elements
+        promptList: document.getElementById('promptList') as HTMLDivElement,
+        promptEditor: document.getElementById('promptEditor') as HTMLDivElement,
+        promptTitle: document.getElementById('promptTitle') as HTMLInputElement,
+        promptText: document.getElementById('promptText') as HTMLTextAreaElement,
+        addPromptButton: document.getElementById('addPromptButton') as HTMLButtonElement,
+        savePromptButton: document.getElementById('savePromptButton') as HTMLButtonElement,
+        cancelPromptButton: document.getElementById('cancelPromptButton') as HTMLButtonElement,
     };
 
     // Check if all elements were found
@@ -54,9 +75,146 @@ export function getUIElements(): SettingsUIElements {
 
 export class SettingsUIManager {
     private elements: SettingsUIElements;
+    private promptEditorState: PromptEditorState;
 
     constructor(elements: SettingsUIElements) {
         this.elements = elements;
+        this.promptEditorState = {
+            isEditing: false,
+            editingPromptId: null
+        };
+        this.initializePromptManagement();
+        this.initializeCloseButton();
+    }
+
+    private initializeCloseButton(): void {
+        this.elements.closeButton.onclick = async () => {
+            await Window.getCurrent().close();
+        };
+    }
+
+    private async initializePromptManagement(): Promise<void> {
+        const {
+            promptList,
+            addPromptButton,
+            promptEditor,
+            promptTitle,
+            promptText,
+            savePromptButton,
+            cancelPromptButton
+        } = this.elements;
+
+        // Event listeners
+        addPromptButton.onclick = () => this.showPromptEditor();
+        savePromptButton.onclick = () => this.savePrompt();
+        cancelPromptButton.onclick = () => this.hidePromptEditor();
+
+        // Initial load
+        await this.refreshPromptList();
+    }
+
+    private async refreshPromptList(): Promise<void> {
+        const { promptList } = this.elements;
+        const prompts = await PromptStore.getAllPrompts();
+        const selectedPrompt = await PromptStore.getSelectedPrompt();
+
+        promptList.innerHTML = '';
+
+        prompts.forEach(prompt => {
+            const promptElement = document.createElement('div');
+            promptElement.className = `prompt-item ${prompt.id === selectedPrompt.id ? 'selected' : ''}`;
+
+            const promptInfo = document.createElement('div');
+            promptInfo.className = 'prompt-info';
+            promptInfo.innerHTML = `
+                <div class="prompt-title">${prompt.title}</div>
+            `;
+
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'prompt-actions';
+
+            if (prompt.id !== 0) { // Don't show edit/delete for default prompt
+                const editButton = document.createElement('button');
+                editButton.textContent = '✏️';
+                editButton.title = 'Edit';
+                editButton.onclick = () => this.editPrompt(prompt);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = '🗑️';
+                deleteButton.title = 'Delete';
+                deleteButton.onclick = () => this.deletePrompt(prompt.id);
+
+                actionsDiv.appendChild(editButton);
+                actionsDiv.appendChild(deleteButton);
+            }
+
+            const selectButton = document.createElement('button');
+            selectButton.textContent = prompt.id === selectedPrompt.id ? '✓ Default' : 'Set Default';
+            selectButton.onclick = () => this.selectPrompt(prompt.id);
+            actionsDiv.appendChild(selectButton);
+
+            promptElement.appendChild(promptInfo);
+            promptElement.appendChild(actionsDiv);
+            promptList.appendChild(promptElement);
+        });
+    }
+
+    private async selectPrompt(id: number): Promise<void> {
+        await PromptStore.setSelectedPrompt(id);
+        await this.refreshPromptList();
+    }
+
+    private async deletePrompt(id: number): Promise<void> {
+        await PromptStore.deletePrompt(id);
+        await this.refreshPromptList();
+    }
+
+    private editPrompt(prompt: { id: number; title: string; prompt: string }): void {
+        const { promptTitle, promptText, promptEditor } = this.elements;
+        this.promptEditorState.isEditing = true;
+        this.promptEditorState.editingPromptId = prompt.id;
+        promptTitle.value = prompt.title;
+        promptText.value = prompt.prompt;
+        promptEditor.classList.add('visible');
+    }
+
+    private showPromptEditor(): void {
+        const { promptTitle, promptText, promptEditor } = this.elements;
+        this.promptEditorState.isEditing = false;
+        this.promptEditorState.editingPromptId = null;
+        promptTitle.value = '';
+        promptText.value = '';
+        promptEditor.classList.add('visible');
+    }
+
+    private hidePromptEditor(): void {
+        const { promptTitle, promptText, promptEditor } = this.elements;
+        promptEditor.classList.remove('visible');
+        this.promptEditorState.isEditing = false;
+        this.promptEditorState.editingPromptId = null;
+        promptTitle.value = '';
+        promptText.value = '';
+    }
+
+    private async savePrompt(): Promise<void> {
+        const { promptTitle, promptText } = this.elements;
+        const title = promptTitle.value.trim();
+        const prompt = promptText.value.trim();
+
+        if (!title || !prompt) {
+            alert('Please fill in both title and prompt');
+            return;
+        }
+
+        if (this.promptEditorState.isEditing && this.promptEditorState.editingPromptId !== null) {
+            await PromptStore.deletePrompt(this.promptEditorState.editingPromptId);
+            await PromptStore.addPrompt(title, prompt);
+        } else {
+            await PromptStore.addPrompt(title, prompt);
+        }
+
+        this.hidePromptEditor();
+        await this.refreshPromptList();
     }
 
     async updateModelList(models: string[]): Promise<void> {

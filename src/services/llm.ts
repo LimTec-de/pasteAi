@@ -4,6 +4,7 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { CONFIG } from '../config';
 import { NotificationService } from './notifications';
 import { Services } from '.';
+import { PromptStore } from './prompt-store';
 
 interface PasteAIErrorResponse {
     status: 'error';
@@ -42,16 +43,16 @@ export class LLMService {
 
     static async improveSentence(text: string, services: Services): Promise<string> {
         const llmType = await services.store?.get('llm_type') as string || 'pasteai';
-        const systemPrompt = await invoke("get_system_prompt_from_settings") as string;
+        const selectedPrompt = await PromptStore.getSelectedPrompt();
 
         try {
             switch (llmType) {
                 case 'ollama':
-                    return await this.improveWithOllama(text, systemPrompt, services);
+                    return await this.improveWithOllama(text, selectedPrompt.prompt, services);
                 case 'openai':
-                    return await this.improveWithOpenAI(text, systemPrompt, services);
+                    return await this.improveWithOpenAI(text, selectedPrompt.prompt, services);
                 case 'pasteai':
-                    return await this.improveWithPasteAI(text, systemPrompt, services);
+                    return await this.improveWithPasteAI(text, selectedPrompt.prompt, services);
                 default:
                     throw new Error('Invalid LLM type');
             }

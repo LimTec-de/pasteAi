@@ -1,5 +1,4 @@
 import { Window } from '@tauri-apps/api/window';
-import { load } from '@tauri-apps/plugin-store';
 import { message } from '@tauri-apps/plugin-dialog';
 import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 import { listen } from '@tauri-apps/api/event';
@@ -14,22 +13,28 @@ import {
   ClipboardMonitor,
   UpdateManager
 } from './services';
+import { PromptStore } from './services/prompt-store';
+import { SettingsStore } from './services/settings-store';
 
 // Services container
 const services: Services = {};
 
 // Application initialization
 async function initializeApp() {
-  services.store = await load('pastai.json', { autoSave: false });
+  // Initialize SettingsStore
+  await SettingsStore.initialize();
+
+  // Initialize PromptStore
+  await PromptStore.initialize();
 
   // Get system unique ID
   // Initialize app ID
   // Try to get existing app ID from store, or generate a new one if not found
-  services.appId = await services.store.get('appId') as string;
+  services.appId = await SettingsStore.get<string>('appId');
   if (!services.appId) {
     services.appId = crypto.randomUUID();
-    await services.store?.set('appId', services.appId);
-    await services.store?.save();
+    await SettingsStore.set('appId', services.appId);
+    await SettingsStore.save();
   }
 
   // Initialize notifications
@@ -56,7 +61,8 @@ async function initializeApp() {
   await ClipboardMonitor.initialize(services);
 
   // Show start window if needed
-  if ((await services.store.get('show_start')) !== false) {
+  const showStart = await SettingsStore.get<boolean>('show_start');
+  if (showStart !== false) {
     await WindowManager.openStart();
   }
 

@@ -6,6 +6,7 @@ import { SettingsUIElements, LLMType } from './settings-ui';
 import { SettingsUIManager } from './settings-ui';
 import { SettingsAPIService } from './settings-api';
 import { SettingsStore } from './settings-store';
+import { PromptStore } from './prompt-store';
 
 export class SettingsManager {
     private ui: SettingsUIManager;
@@ -18,12 +19,48 @@ export class SettingsManager {
     }
 
     private async initializeEventListeners(): Promise<void> {
-        const { llmTypeSelect, ollamaUrl, loginButton, saveButton } = this.elements;
+        const { llmTypeSelect, ollamaUrl, loginButton, modelSelect, apiKeyInput } = this.elements;
 
-        llmTypeSelect.addEventListener('change', () => this.handleLLMTypeChange());
-        ollamaUrl.addEventListener('change', () => this.handleLLMTypeChange());
+        llmTypeSelect.addEventListener('change', async () => {
+            await this.handleLLMTypeChange();
+            await this.saveSettings();
+        });
+
+        ollamaUrl.addEventListener('change', async () => {
+            await this.handleLLMTypeChange();
+            await this.saveSettings();
+        });
+
+        modelSelect.addEventListener('change', () => this.saveSettings());
+        apiKeyInput.addEventListener('change', () => this.saveSettings());
+
         loginButton.addEventListener('click', () => this.handleLogin());
-        saveButton.addEventListener('click', () => this.handleSave());
+    }
+
+    private async saveSettings(): Promise<void> {
+        const { llmTypeSelect, ollamaUrl, modelSelect, apiKeyInput } = this.elements;
+
+        try {
+            // Save all settings
+            await SettingsStore.set('llm_type', llmTypeSelect.value);
+            await SettingsStore.set('ollama_url', ollamaUrl.value);
+            await SettingsStore.set('ollama_model', modelSelect.value);
+            await SettingsStore.set('openai_api_key', apiKeyInput.value);
+            await SettingsStore.save();
+
+            // Emit settings saved event
+            await emit('settings-saved', { loggedIn: true, token: apiKeyInput.value });
+        } catch (error) {
+            console.error('Error saving settings:', error);
+            // Show error to user
+            const errorDiv = document.createElement('div');
+            errorDiv.style.color = 'red';
+            errorDiv.style.padding = '10px';
+            errorDiv.textContent = `Error saving settings: ${error instanceof Error ? error.message : String(error)}`;
+            this.elements.llmTypeSelect.parentElement?.appendChild(errorDiv);
+            // Remove error message after 3 seconds
+            setTimeout(() => errorDiv.remove(), 3000);
+        }
     }
 
     private async handleLLMTypeChange(): Promise<void> {
@@ -74,39 +111,6 @@ export class SettingsManager {
             console.error('Login error:', error);
         } finally {
             loginButton.disabled = false;
-        }
-    }
-
-    private async handleSave(): Promise<void> {
-        const { saveButton, llmTypeSelect, ollamaUrl, modelSelect, apiKeyInput, systemPromptInput } = this.elements;
-
-        try {
-            saveButton.disabled = true;
-
-            // Save all settings
-            await SettingsStore.set('llm_type', llmTypeSelect.value);
-            await SettingsStore.set('ollama_url', ollamaUrl.value);
-            await SettingsStore.set('ollama_model', modelSelect.value);
-            await SettingsStore.set('openai_api_key', apiKeyInput.value);
-
-            // Save system prompt
-            await invoke('set_system_prompt_from_settings', { prompt: systemPromptInput.value });
-            await SettingsStore.save();
-
-            // Emit settings saved event
-            await emit('settings-saved', { loggedIn: true, token: apiKeyInput.value });
-
-            // Close the window
-            await Window.getCurrent().close();
-        } catch (error) {
-            console.error('Error saving settings:', error);
-            saveButton.disabled = false;
-            // Show error to user
-            const errorDiv = document.createElement('div');
-            errorDiv.style.color = 'red';
-            errorDiv.style.padding = '10px';
-            errorDiv.textContent = `Error saving settings: ${error instanceof Error ? error.message : String(error)}`;
-            saveButton.parentElement?.insertBefore(errorDiv, saveButton);
         }
     }
 
@@ -164,7 +168,7 @@ export class SettingsManager {
     }
 
     async loadExistingSettings(): Promise<void> {
-        const { llmTypeSelect, ollamaUrl, apiKeyInput, systemPromptInput, emailInput } = this.elements;
+        const { llmTypeSelect, ollamaUrl, apiKeyInput, emailInput } = this.elements;
 
         const llmType = await SettingsStore.get<string>('llm_type') || 'pasteai';
         llmTypeSelect.value = llmType;
@@ -172,7 +176,6 @@ export class SettingsManager {
 
         ollamaUrl.value = await SettingsStore.get<string>('ollama_url') || 'http://localhost:11434';
         apiKeyInput.value = await SettingsStore.get<string>('openai_api_key') || '';
-        systemPromptInput.value = await invoke('get_system_prompt_from_settings') as string;
         emailInput.value = await SettingsStore.get<string>('email') || '';
 
         if (llmType === 'ollama') {

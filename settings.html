@@ -93,6 +93,78 @@
         #llmType {
             width: 200px;
         }
+
+        .prompt-list {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .prompt-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .prompt-item:last-child {
+            border-bottom: none;
+        }
+
+        .prompt-item.selected {
+            background-color: #e3f2fd;
+        }
+
+        .prompt-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .prompt-title {
+            font-weight: 500;
+            margin-bottom: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .prompt-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .prompt-actions button {
+            padding: 4px 8px;
+            font-size: 0.9em;
+            min-width: 32px;
+            height: 32px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .prompt-actions button[title] {
+            min-width: 32px;
+            width: 32px;
+        }
+
+        .prompt-editor {
+            display: none;
+            margin-top: 20px;
+            padding: 16px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f8f9fa;
+        }
+
+        .prompt-editor.visible {
+            display: block;
+        }
     </style>
 </head>
 
@@ -142,12 +214,31 @@
             <label for="apiKey">🔑 API Key:</label>
             <input type="password" id="apiKey" placeholder="Enter your OpenAI API key">
         </div>
+
         <div class="input-group">
-            <label for="systemPrompt">💬 System Prompt:</label>
-            <textarea id="systemPrompt" placeholder="Enter your system prompt"></textarea>
-            <div class="info-text">Leave empty for default prompt</div>
+            <label>💬 Prompts:</label>
+            <div class="prompt-list" id="promptList">
+                <!-- Prompts will be populated here -->
+            </div>
+            <button id="addPromptButton" style="margin-top: 10px;">➕ Add New Prompt</button>
+
+            <div id="promptEditor" class="prompt-editor">
+                <div class="input-group">
+                    <label for="promptTitle">Title:</label>
+                    <input type="text" id="promptTitle" placeholder="Enter prompt title">
+                </div>
+                <div class="input-group">
+                    <label for="promptText">Prompt:</label>
+                    <textarea id="promptText" placeholder="Enter your prompt"></textarea>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="savePromptButton">💾 Save Prompt</button>
+                    <button id="cancelPromptButton" style="background: #666;">❌ Cancel</button>
+                </div>
+            </div>
         </div>
-        <button id="saveButton">💾 Save</button>
+
+        <button id="closeButton" style="margin-top: 24px; background: #666;">✖️ Close</button>
     </div>
     <script type="module" src="/src/settings.ts"></script>
 </body>
