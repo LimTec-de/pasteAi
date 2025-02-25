@@ -43,7 +43,7 @@ export class WindowManager {
      * @returns Promise with the selected prompt or null if canceled
      */
     static async openPromptSelector(): Promise<{ id: number; title: string; prompt: string } | null> {
-        const promptSelectorWindow = await this.createWindow('prompt-selector', 'prompt-selector');
+        const promptSelectorWindow = await this.createWindow('prompt', 'prompt');
 
         return new Promise((resolve) => {
             // Listen for a custom event from the prompt selector window
