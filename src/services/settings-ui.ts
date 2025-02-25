@@ -133,7 +133,8 @@ export class SettingsUIManager {
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'prompt-actions';
 
-            if (prompt.id !== 0) { // Don't show edit/delete for default prompt
+            // Only show edit/delete buttons for user-created prompts (id >= 1000)
+            if (prompt.id >= 1000) {
                 const editButton = document.createElement('button');
                 editButton.textContent = '✏️';
                 editButton.title = 'Edit';
@@ -170,6 +171,12 @@ export class SettingsUIManager {
     }
 
     private editPrompt(prompt: { id: number; title: string; prompt: string }): void {
+        // Prevent editing default prompts (id < 1000)
+        if (prompt.id < 1000) {
+            alert('Default prompts cannot be edited');
+            return;
+        }
+
         const { promptTitle, promptText, promptEditor } = this.elements;
         this.promptEditorState.isEditing = true;
         this.promptEditorState.editingPromptId = prompt.id;
@@ -207,8 +214,14 @@ export class SettingsUIManager {
         }
 
         if (this.promptEditorState.isEditing && this.promptEditorState.editingPromptId !== null) {
-            await PromptStore.deletePrompt(this.promptEditorState.editingPromptId);
-            await PromptStore.addPrompt(title, prompt);
+            // Prevent editing default prompts (id < 1000)
+            if (this.promptEditorState.editingPromptId < 1000) {
+                alert('Default prompts cannot be edited');
+                this.hidePromptEditor();
+                return;
+            }
+
+            await PromptStore.updatePrompt(this.promptEditorState.editingPromptId, title, prompt);
         } else {
             await PromptStore.addPrompt(title, prompt);
         }
