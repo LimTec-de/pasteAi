@@ -11,10 +11,17 @@ async function initializePromptSelector(): Promise<void> {
 
         const promptList = document.getElementById('prompt-list') as HTMLUListElement;
         const statusMessage = document.getElementById('status-message') as HTMLDivElement;
+        const cancelButton = document.getElementById('cancel-button') as HTMLButtonElement;
 
-        if (!promptList || !statusMessage) {
+        if (!promptList || !statusMessage || !cancelButton) {
             throw new Error('Required DOM elements not found');
         }
+
+        // Set up cancel button functionality
+        cancelButton.addEventListener('click', async () => {
+            // Close the window when cancel is clicked
+            await Window.getCurrent().close();
+        });
 
         // Get all prompts from the store
         const prompts = await PromptStore.getAllPrompts();
