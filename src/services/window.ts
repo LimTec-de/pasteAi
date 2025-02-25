@@ -37,6 +37,37 @@ export class WindowManager {
     static async openStart() {
         return this.createWindow('start', 'start');
     }
+
+    /**
+     * Opens the prompt selector window and returns the selected prompt
+     * @returns Promise with the selected prompt or null if canceled
+     */
+    static async openPromptSelector(): Promise<{ id: number; title: string; prompt: string } | null> {
+        const promptSelectorWindow = await this.createWindow('prompt-selector', 'prompt-selector');
+
+        return new Promise((resolve) => {
+            // Listen for a custom event from the prompt selector window
+            const unlisten = Window.getCurrent().listen('prompt-selected', (event) => {
+                // Clean up the listener
+                unlisten.then(fn => fn());
+
+                // Close the window
+                promptSelectorWindow.close();
+
+                // Resolve with the selected prompt
+                resolve(event.payload as { id: number; title: string; prompt: string } | null);
+            });
+
+            // Also listen for window close event in case user cancels
+            promptSelectorWindow.once('tauri://destroyed', () => {
+                // Clean up the listener
+                unlisten.then(fn => fn());
+
+                // Resolve with null if window was closed without selection
+                resolve(null);
+            });
+        });
+    }
 }
 
 export enum StatusType {

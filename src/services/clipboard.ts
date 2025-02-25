@@ -1,7 +1,7 @@
 import { onTextUpdate, startListening } from "tauri-plugin-clipboard-api";
 import clipboard from "tauri-plugin-clipboard-api";
 import { CONFIG } from '../config';
-import { Services } from '.';
+import { Services, WindowManager } from '.';
 import { LLMService, StatusWindow, StatusType } from '.';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { Window } from '@tauri-apps/api/window';
@@ -102,35 +102,30 @@ export class ClipboardMonitor {
         this.state.lastNotImprovedContent = newText;
 
         try {
-            // Check for API consent
-            const hasConsent = await services.store?.get('hasConsent') as boolean;
 
-            if (!hasConsent) {
-                const consent = await confirm(
-                    'To improve your text, we need to send it to the AI service you have defined in settings. ' +
-                    'Do you agree to this?',
-                    {
-                        title: CONFIG.APP_NAME,
-                        kind: 'warning'
-                    }
-                );
-                (await Window.getByLabel('main'))?.hide();
+            const selectedPrompt = await WindowManager.openPromptSelector();
 
-                if (!consent) {
-                    await StatusWindow.display('Text improvement cancelled', StatusType.INFO);
-                    return;
-                } else {
-                    await services.store?.set('hasConsent', true);
-                    await services.store?.save();
-                }
+            if (selectedPrompt) {
+                // User selected a prompt
+                console.log(`Selected prompt: ${selectedPrompt.title}`);
+                console.log(`Prompt text: ${selectedPrompt.prompt}`);
+
+                await StatusWindow.display('Starting to improve sentence', StatusType.WORKING);
+
+                this.state.lastImprovedContent = await LLMService.improveSentence(newText, services, selectedPrompt.prompt);
+                await clipboard.writeText(this.state.lastImprovedContent);
+
+                await StatusWindow.display('Improved sentence ready', StatusType.OK);
+            } else {
+                console.log('No prompt selected');
+                //reset copy paste variables
+                this.state.lastImprovedContent = "";
+                this.state.lastNotImprovedContent = "";
+                this.state.copyCount = 0;
+                this.state.isOldCopy = true;
             }
 
-            await StatusWindow.display('Starting to improve sentence', StatusType.WORKING);
 
-            this.state.lastImprovedContent = await LLMService.improveSentence(newText, services);
-            await clipboard.writeText(this.state.lastImprovedContent);
-
-            await StatusWindow.display('Improved sentence ready', StatusType.OK);
         } catch (error) {
             console.error("Error improving sentence:", error);
 

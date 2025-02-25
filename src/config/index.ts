@@ -27,6 +27,11 @@ export interface WindowConfig {
         height: number;
         title: string;
     };
+    'prompt-selector': {
+        width: number;
+        height: number;
+        title: string;
+    };
 }
 
 export const CONFIG: AppConfig = {
@@ -57,5 +62,10 @@ export const WINDOW_CONFIG: WindowConfig = {
         width: 300,
         height: 50,
         title: 'Status'
+    },
+    'prompt-selector': {
+        width: 600,
+        height: 500,
+        title: 'Select a Prompt'
     }
 }; 
