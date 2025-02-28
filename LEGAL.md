@@ -35,6 +35,35 @@ PasteAI collects and processes:
 - You can request deletion of your PasteAI account data
 - No account is required to use the application with local processing
 
+### GDPR Compliance (EU Users)
+For users in the European Union, we comply with the General Data Protection Regulation (GDPR):
+
+- **Legal Basis for Processing**: We process your data based on your consent and for the performance of our service contract with you.
+- **Data Subject Rights**: You have the right to:
+  - Access your personal data
+  - Rectify inaccurate personal data
+  - Erase your personal data ("right to be forgotten")
+  - Restrict processing of your data
+  - Data portability
+  - Object to processing
+  - Not be subject to automated decision-making
+- **Data Protection Officer**: For GDPR-related inquiries, contact our DPO at info@limtec.com
+- **Supervisory Authority**: You have the right to lodge a complaint with your local data protection authority
+
+### Data Retention Policy
+- API keys are stored only for as long as your account is active
+- Clipboard history is stored locally and can be cleared at any time
+- We do not retain processed text after the completion of the requested operation
+- Account information is retained until you request deletion
+
+### Cookie Policy
+PasteAI uses essential cookies and similar technologies to ensure the proper functioning of our application. We do not use cookies for tracking or advertising purposes. The cookies we use are:
+
+- **Session cookies**: To maintain your session state
+- **Preference cookies**: To remember your settings and preferences
+
+You can manage or delete cookies through your browser settings. Disabling essential cookies may affect the functionality of the application.
+
 ## Third-Party Services
 
 ### OpenAI API
@@ -54,8 +83,15 @@ PasteAI uses the following major components:
 
 Full dependency licenses can be found in the node_modules directory.
 
+## International Data Transfers
+If you're using the OpenAI API option, your data may be transferred to servers outside the EU. These transfers are protected by:
+- Standard Contractual Clauses (SCCs)
+- OpenAI's compliance with data protection regulations
+
 ## Contact
 For legal inquiries, please visit our [Imprint page](https://www.limtec.de/#imprint).
+
+For data protection inquiries or to exercise your data subject rights, please contact [contact email].
 
 ## Changes to Legal Terms
 We reserve the right to modify these terms. Users will be notified of significant changes. 
