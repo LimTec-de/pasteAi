@@ -35,7 +35,7 @@ export interface WindowConfig {
 }
 
 export const CONFIG: AppConfig = {
-    MAX_TEXT_LENGTH: 300,
+    MAX_TEXT_LENGTH: 3000,
     COPY_DETECTION_INTERVAL: 100,
     COPY_DETECTION_INTERVAL_MAX: 3000,
     COPY_THRESHOLD: 3,

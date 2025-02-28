@@ -47,10 +47,10 @@ export class ClipboardMonitor {
     }
 
     private static async handleTextUpdate(newText: string, services: Services) {
-        if (this.shouldSkipImprovement(newText)) {
+        /*if (this.shouldSkipImprovement(newText)) {
             await this.handleSkippedImprovement();
             return;
-        }
+        } do not neet this anymore since we have now a popup to confirm the improvement*/
 
         await this.updateClipboardState(newText);
 
@@ -62,7 +62,7 @@ export class ClipboardMonitor {
                 await this.improveAndUpdateClipboard(newText, services);
             }
         } else {
-            console.log(`Skipping improvement`);
+            console.log(`Skipping improvements`);
             console.log(`----------------------------------------------------------------------`);
         }
     }
