@@ -54,6 +54,8 @@
       "exceptionDomain": "localhost",
       "frameworks": []
     },
-    "resources": []
+    "windows": {
+      "signCommand": "trusted-signing-cli -e https://neu.codesigning.azure.net/ -a limtec -c CodeSigningCertificate -d pasteAI %1"
+    }
   }
 }
