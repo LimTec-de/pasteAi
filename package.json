@@ -10,22 +10,22 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.2.0",
+    "@tauri-apps/api": "^2.3.0",
     "@tauri-apps/plugin-autostart": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-global-shortcut": "^2.2.0",
     "@tauri-apps/plugin-http": "^2.3.0",
-    "@tauri-apps/plugin-log": "^2.2.1",
+    "@tauri-apps/plugin-log": "^2.2.3",
     "@tauri-apps/plugin-notification": "^2.2.1",
     "@tauri-apps/plugin-process": "^2.2.0",
     "@tauri-apps/plugin-shell": "^2.2.0",
     "@tauri-apps/plugin-store": "^2.2.0",
-    "@tauri-apps/plugin-updater": "^2.5.0",
-    "openai": "^4.85.2",
+    "@tauri-apps/plugin-updater": "^2.5.1",
+    "openai": "^4.86.1",
     "tauri-plugin-clipboard-api": "^2.1.11"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.2.7",
+    "@tauri-apps/cli": "^2.3.0",
     "typescript": "^5.7.3",
     "vite": "^5.4.14"
   }
