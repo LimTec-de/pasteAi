@@ -89,6 +89,11 @@ export class TrayManager {
                 },
                 await PredefinedMenuItem.new({ item: 'Separator' }),
                 {
+                    id: 'start',
+                    text: 'How to use',
+                    action: () => WindowManager.openStart(),
+                },
+                {
                     id: 'quit',
                     text: 'Quit',
                     action: () => exit(0),

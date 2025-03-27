@@ -1,7 +1,7 @@
 {
   "name": "pasteai",
   "private": true,
-  "version": "0.9.2",
+  "version": "0.9.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,7 +10,7 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2.3.0",
+    "@tauri-apps/api": "^2.4.0",
     "@tauri-apps/plugin-autostart": "^2.2.0",
     "@tauri-apps/plugin-dialog": "^2.2.0",
     "@tauri-apps/plugin-global-shortcut": "^2.2.0",
@@ -25,7 +25,7 @@
     "tauri-plugin-clipboard-api": "^2.1.11"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.3.0",
+    "@tauri-apps/cli": "^2.4.0",
     "typescript": "^5.7.3",
     "vite": "^5.4.14"
   }
