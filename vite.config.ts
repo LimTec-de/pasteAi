@@ -34,7 +34,9 @@ export default defineConfig(async () => ({
         settings: './settings.html',
         about: './about.html',
         start: './start.html',
-        prompt: './prompt.html'
+        prompt: './prompt.html',
+        status: './status.html',
+        windowheader: './src/components/window-header.html'
       }
     }
   }
