@@ -8,6 +8,7 @@
     "permissions": [
         "core:default",
         "core:window:allow-close",
+        "core:window:allow-set-position",
         "shell:allow-open",
         "process:default",
         "notification:default"

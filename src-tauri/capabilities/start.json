@@ -9,6 +9,7 @@
         "core:default",
         "shell:allow-open",
         "core:window:allow-close",
+        "core:window:allow-set-position",
         "store:default"
     ]
 }
