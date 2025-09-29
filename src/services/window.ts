@@ -41,6 +41,31 @@ export class WindowManager {
         return this.createWindow('start', 'start');
     }
 
+    static async openStatus() {
+        const statusWindow = new WebviewWindow('status', {
+            url: '/status.html',
+            title: 'Status',
+            width: 400,
+            height: 80,
+            resizable: false,
+            alwaysOnTop: true,
+            transparent: true,
+            decorations: false,
+            skipTaskbar: true,
+            visible: false, // Start hidden
+        });
+
+        statusWindow.once('tauri://created', () => {
+            console.log('Status window created');
+        });
+
+        statusWindow.once('tauri://error', (error) => {
+            console.error('Failed to create status window:', error);
+        });
+
+        return statusWindow;
+    }
+
     /**
      * Opens the prompt selector window and returns the selected prompt
      * @returns Promise with the selected prompt or null if canceled
@@ -81,54 +106,33 @@ export enum StatusType {
 }
 
 export class StatusWindow {
-    private static hideTimeout: number | null = null;
-    private static isVisible: boolean = false;
+    private static statusWindow: WebviewWindow | null = null;
 
     static async display(message: string, type: StatusType = StatusType.INFO, autohide: boolean = true) {
-        const mainWindow = Window.getCurrent();
-        if (!mainWindow) return;
-
-        await mainWindow.show();
-
-        const statusElement = document.getElementById('status-message');
-        if (!statusElement) return;
-
-        statusElement.innerHTML = message;
-        statusElement.style.display = 'block';
-        statusElement.className = `status-${type}`;
-
-        await new Promise(resolve => setTimeout(resolve, 50));
-
-        const rect = statusElement.getBoundingClientRect();
-        const padding = 40;
-
-        const newSize = new LogicalSize(
-            Math.min(Math.max(rect.width + padding, 320), 600), // Adjusted for new design
-            Math.min(rect.height + padding, 100) // Adjusted height
-        );
-        await mainWindow.setSize(newSize);
-
-        // Position window in top left corner with margin
-        const margin = 20;
-        await mainWindow.setPosition(new LogicalPosition(margin, margin));
-
-        // Handle auto-hide timeout
-        if (this.hideTimeout) {
-            clearTimeout(this.hideTimeout);
+        // Create status window if it doesn't exist
+        if (!this.statusWindow) {
+            this.statusWindow = await WindowManager.openStatus();
+            // Wait a bit for the window to be ready
+            await new Promise(resolve => setTimeout(resolve, 100));
         }
 
-        if (autohide) {
-            this.hideTimeout = window.setTimeout(async () => {
-                const element = document.getElementById('status-message');
-                if (element) {
-                    element.style.display = 'none';
-                }
-                await mainWindow.hide();
-                this.isVisible = false;
-            }, type === StatusType.ERROR ? 10000 : 1000);
-        } else {
-            // If not auto-hiding, clear any existing timeout
-            this.hideTimeout = null;
+        // Send display event to status window
+        await this.statusWindow.emit('status-display', { message, type, autohide });
+
+        // Show the status window
+        await this.statusWindow.show();
+    }
+
+    static async hide() {
+        if (this.statusWindow) {
+            await this.statusWindow.emit('status-hide');
+        }
+    }
+
+    static async destroy() {
+        if (this.statusWindow) {
+            await this.statusWindow.close();
+            this.statusWindow = null;
         }
     }
 } 

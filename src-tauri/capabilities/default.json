@@ -5,7 +5,8 @@
   "windows": [
     "main",
     "settings",
-    "prompt"
+    "prompt",
+    "status"
   ],
   "permissions": [
     {
