@@ -82,8 +82,9 @@ export enum StatusType {
 
 export class StatusWindow {
     private static hideTimeout: number | null = null;
+    private static isVisible: boolean = false;
 
-    static async display(message: string, type: StatusType = StatusType.INFO) {
+    static async display(message: string, type: StatusType = StatusType.INFO, autohide: boolean = true) {
         const mainWindow = Window.getCurrent();
         if (!mainWindow) return;
 
@@ -107,15 +108,23 @@ export class StatusWindow {
         );
         await mainWindow.setSize(newSize);
 
+        // Handle auto-hide timeout
         if (this.hideTimeout) {
             clearTimeout(this.hideTimeout);
         }
-        this.hideTimeout = window.setTimeout(async () => {
-            const element = document.getElementById('status-message');
-            if (element) {
-                element.style.display = 'none';
-            }
-            await mainWindow.hide();
-        }, type === StatusType.ERROR ? 10000 : 1000);
+
+        if (autohide) {
+            this.hideTimeout = window.setTimeout(async () => {
+                const element = document.getElementById('status-message');
+                if (element) {
+                    element.style.display = 'none';
+                }
+                await mainWindow.hide();
+                this.isVisible = false;
+            }, type === StatusType.ERROR ? 10000 : 1000);
+        } else {
+            // If not auto-hiding, clear any existing timeout
+            this.hideTimeout = null;
+        }
     }
 } 
