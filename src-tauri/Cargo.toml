@@ -1,6 +1,6 @@
 [package]
 name = "pasteAI"
-version = "0.9.3"
+version = "0.10.0"
 description = "AI powered clipboard improvement tool"
 authors = ["Sebastian Igerl"]
 edition = "2021"
