@@ -1,6 +1,6 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { Window } from '@tauri-apps/api/window';
-import { LogicalSize } from '@tauri-apps/api/window';
+import { LogicalSize, LogicalPosition } from '@tauri-apps/api/window';
 import { WINDOW_CONFIG, WindowConfig } from '../config';
 
 export class WindowManager {
@@ -103,10 +103,14 @@ export class StatusWindow {
         const padding = 40;
 
         const newSize = new LogicalSize(
-            Math.min(Math.max(rect.width + padding, 300), 800),
-            Math.min(rect.height + padding, 400)
+            Math.min(Math.max(rect.width + padding, 320), 600), // Adjusted for new design
+            Math.min(rect.height + padding, 100) // Adjusted height
         );
         await mainWindow.setSize(newSize);
+
+        // Position window in top left corner with margin
+        const margin = 20;
+        await mainWindow.setPosition(new LogicalPosition(margin, margin));
 
         // Handle auto-hide timeout
         if (this.hideTimeout) {
