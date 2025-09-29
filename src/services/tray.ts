@@ -95,6 +95,34 @@ export class TrayManager {
 
         return await Menu.new({
             items: [
+                // Primary actions
+                {
+                    id: 'start',
+                    text: 'How to use',
+                    action: () => WindowManager.openStart(),
+                },
+                {
+                    id: 'settings',
+                    text: 'Settings',
+                    action: () => WindowManager.openSettings(),
+                },
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                // Configuration options
+                promptSubmenu,
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                // Help & Support
+                {
+                    id: 'checkUpdates',
+                    text: 'Check for Updates...',
+                    action: async () => {
+                        await UpdateManager.checkUpdate(true);
+                    }
+                },
+                {
+                    id: 'about',
+                    text: 'About',
+                    action: () => WindowManager.openAbout(),
+                },
                 {
                     id: 'autostart',
                     text: 'Start with system',
@@ -104,36 +132,14 @@ export class TrayManager {
                     },
                 },
                 await PredefinedMenuItem.new({ item: 'Separator' }),
-                promptSubmenu,
-                {
-                    id: 'checkUpdates',
-                    text: 'Check for Updates...',
-                    action: async () => {
-                        await UpdateManager.checkUpdate(true);
-                    }
-                },
-                {
-                    id: 'settings',
-                    text: 'Settings',
-                    action: () => WindowManager.openSettings(),
-                },
-                {
-                    id: 'about',
-                    text: 'About',
-                    action: () => WindowManager.openAbout(),
-                },
-                await PredefinedMenuItem.new({ item: 'Separator' }),
+                // Debug/Developer options
                 {
                     id: 'debug',
                     text: 'Show debug window',
                     action: () => Window.getCurrent().show(),
                 },
                 await PredefinedMenuItem.new({ item: 'Separator' }),
-                {
-                    id: 'start',
-                    text: 'How to use',
-                    action: () => WindowManager.openStart(),
-                },
+                // Exit
                 {
                     id: 'quit',
                     text: 'Quit',
