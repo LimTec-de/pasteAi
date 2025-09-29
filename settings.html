@@ -6,76 +6,174 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings</title>
+    <link rel="stylesheet" href="/src/components/window-header.css">
     <style>
-        body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            padding: 20px;
-            background: #f5f5f5;
+        * {
+            box-sizing: border-box;
         }
 
+        body {
+            font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2a2a2a 100%);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+
         .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            height: calc(100vh - 48px);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+        }
+
+        .container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .container::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        .container::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 3px;
+        }
+
+        .container::-webkit-scrollbar-thumb:hover {
+            background: #666;
         }
 
         h1 {
-            margin-top: 0;
-            color: #333;
-            font-size: 1.5em;
+            margin: 0 0 24px 0;
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            text-align: center;
         }
 
         .input-group {
-            margin-bottom: 20px;
+            margin-bottom: 24px;
+            background: linear-gradient(135deg, #2d2d2d 0%, #363636 100%);
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #555;
+            transition: all 0.2s ease;
+        }
+
+        .input-group:hover {
+            background: linear-gradient(135deg, #323232 0%, #3a3a3a 100%);
+            border-color: #666;
         }
 
         label {
             display: block;
             margin-bottom: 8px;
-            color: #555;
+            color: #ffffff;
+            font-weight: 500;
+            font-size: 13px;
         }
 
         input[type="text"],
         input[type="password"],
-        textarea {
+        textarea,
+        select {
             width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
+            padding: 10px 12px;
+            border: 1px solid #666;
+            border-radius: 8px;
+            background: #1a1a1a;
+            color: #ffffff;
+            font-size: 13px;
+            transition: all 0.2s ease;
+        }
+
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: #888;
+            background: #222;
+            box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+        }
+
+        input::placeholder,
+        textarea::placeholder {
+            color: #888;
         }
 
         textarea {
-            min-height: 100px;
+            min-height: 80px;
             resize: vertical;
+            font-family: inherit;
         }
 
-        button {
-            background: #007AFF;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
+        select {
             cursor: pointer;
         }
 
+        select option {
+            background: #2a2a2a;
+            color: white;
+        }
+
+        button {
+            background: linear-gradient(135deg, #4a4a4a 0%, #555 100%);
+            color: #ffffff;
+            border: 1px solid #666;
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
         button:hover {
-            background: #0056b3;
+            background: linear-gradient(135deg, #555 0%, #666 100%);
+            border-color: #777;
+            transform: translateY(-1px);
+        }
+
+        button:active {
+            transform: translateY(0);
         }
 
         .status {
-            margin-top: 10px;
-            color: #666;
+            margin-top: 8px;
+            font-size: 12px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            background: #333;
+            border: 1px solid #555;
+            color: #ccc;
+        }
+
+        .status[style*="color: #ff0000"] {
+            background: #2a1a1a;
+            border-color: #5a2a2a;
+            color: #ff6b6b;
+        }
+
+        .status[style*="color: #008000"] {
+            background: #1a2a1a;
+            border-color: #2a5a2a;
+            color: #51cf66;
         }
 
         .info-text {
-            font-size: 0.85em;
-            color: #666;
-            margin-top: 4px;
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 6px;
             font-style: italic;
+            line-height: 1.4;
         }
 
         .radio-group {
@@ -91,32 +189,34 @@
         }
 
         #llmType {
-            width: 200px;
+            width: 100%;
         }
 
         .prompt-list {
-            border: 1px solid #ddd;
-            border-radius: 4px;
+            border: 1px solid #555;
+            border-radius: 8px;
             margin-bottom: 20px;
-            max-height: 300px;
+            max-height: 250px;
             overflow-y: auto;
+            background: #1a1a1a;
         }
 
         .prompt-item {
-            padding: 8px 12px;
-            border-bottom: 1px solid #ddd;
+            padding: 12px 16px;
+            border-bottom: 1px solid #333;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 12px;
+            transition: background 0.2s ease;
         }
 
         .prompt-item:last-child {
             border-bottom: none;
         }
 
-        .prompt-item.selected {
-            background-color: #e3f2fd;
+        .prompt-item:hover {
+            background: #2a2a2a;
         }
 
         .prompt-info {
@@ -127,6 +227,7 @@
         .prompt-title {
             font-weight: 500;
             margin-bottom: 0;
+            color: #ffffff;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -139,27 +240,28 @@
         }
 
         .prompt-actions button {
-            padding: 4px 8px;
-            font-size: 0.9em;
-            min-width: 32px;
-            height: 32px;
+            padding: 6px 10px;
+            font-size: 11px;
+            min-width: 28px;
+            height: 28px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
+            border-radius: 6px;
         }
 
         .prompt-actions button[title] {
-            min-width: 32px;
-            width: 32px;
+            min-width: 28px;
+            width: 28px;
         }
 
         .prompt-editor {
             display: none;
             margin-top: 20px;
             padding: 16px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background-color: #f8f9fa;
+            border: 1px solid #555;
+            border-radius: 8px;
+            background: #2d2d2d;
         }
 
         .prompt-editor.visible {
@@ -169,8 +271,8 @@
 </head>
 
 <body>
+    <div id="windowHeaderContainer"></div>
     <div class="container">
-        <h1>⚙️ Settings</h1>
         <div class="input-group">
             <label for="llmType">🤖 LLM Provider:</label>
             <select id="llmType" name="llmType" style="padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
@@ -237,9 +339,16 @@
                 </div>
             </div>
         </div>
-
-        <button id="closeButton" style="margin-top: 24px; background: #666;">✖️ Close</button>
     </div>
+    <script>
+        // Load shared header component
+        fetch('/src/components/window-header.html')
+            .then(response => response.text())
+            .then(html => {
+                document.getElementById('windowHeaderContainer').innerHTML = html;
+                document.getElementById('windowTitle').textContent = '⚙️ Settings';
+            });
+    </script>
     <script type="module" src="/src/settings.ts"></script>
 </body>
 

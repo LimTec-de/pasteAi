@@ -1,6 +1,6 @@
 import { PromptStore } from './services/prompt-store';
 import { SettingsStore } from './services/settings-store';
-import { Window } from '@tauri-apps/api/window';
+import { Window, PhysicalPosition } from '@tauri-apps/api/window';
 
 async function initializePromptSelector(): Promise<void> {
     try {
@@ -62,7 +62,42 @@ async function initializePromptSelector(): Promise<void> {
     }
 }
 
+function initializeWindowMovement(): void {
+    const windowHeader = document.querySelector('.window-header') as HTMLElement;
+    if (!windowHeader) return;
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    windowHeader.addEventListener('mousedown', async (e) => {
+        isDragging = true;
+        const position = await Window.getCurrent().outerPosition();
+        startX = e.clientX - position.x;
+        startY = e.clientY - position.y;
+    });
+
+    window.addEventListener('mousemove', async (e) => {
+        if (!isDragging) return;
+
+        await Window.getCurrent().setPosition(new PhysicalPosition(e.clientX - startX, e.clientY - startY));
+    });
+
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    // Handle close button
+    const closeButton = document.getElementById('closeButton');
+    if (closeButton) {
+        closeButton.addEventListener('click', async () => {
+            await Window.getCurrent().close();
+        });
+    }
+}
+
 // Initialize when DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
     initializePromptSelector();
+    initializeWindowMovement();
 }); 

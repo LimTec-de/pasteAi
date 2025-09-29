@@ -11,7 +11,6 @@ interface PromptEditorState {
 
 export interface SettingsUIElements {
     apiKeyInput: HTMLInputElement;
-    closeButton: HTMLButtonElement;
     ollamaUrl: HTMLInputElement;
     modelSelect: HTMLSelectElement;
     llmTypeSelect: HTMLSelectElement;
@@ -37,7 +36,6 @@ export interface SettingsUIElements {
 export function getUIElements(): SettingsUIElements {
     const elements = {
         apiKeyInput: document.getElementById('apiKey') as HTMLInputElement,
-        closeButton: document.getElementById('closeButton') as HTMLButtonElement,
         ollamaUrl: document.getElementById('ollamaUrl') as HTMLInputElement,
         modelSelect: document.getElementById('ollamaModel') as HTMLSelectElement,
         llmTypeSelect: document.getElementById('llmType') as HTMLSelectElement,
@@ -84,13 +82,6 @@ export class SettingsUIManager {
             editingPromptId: null
         };
         this.initializePromptManagement();
-        this.initializeCloseButton();
-    }
-
-    private initializeCloseButton(): void {
-        this.elements.closeButton.onclick = async () => {
-            await Window.getCurrent().close();
-        };
     }
 
     private async initializePromptManagement(): Promise<void> {
@@ -116,13 +107,12 @@ export class SettingsUIManager {
     private async refreshPromptList(): Promise<void> {
         const { promptList } = this.elements;
         const prompts = await PromptStore.getAllPrompts();
-        const selectedPrompt = await PromptStore.getSelectedPrompt();
 
         promptList.innerHTML = '';
 
         prompts.forEach(prompt => {
             const promptElement = document.createElement('div');
-            promptElement.className = `prompt-item ${prompt.id === selectedPrompt.id ? 'selected' : ''}`;
+            promptElement.className = 'prompt-item';
 
             const promptInfo = document.createElement('div');
             promptInfo.className = 'prompt-info';
@@ -149,10 +139,6 @@ export class SettingsUIManager {
                 actionsDiv.appendChild(deleteButton);
             }
 
-            const selectButton = document.createElement('button');
-            selectButton.textContent = prompt.id === selectedPrompt.id ? '✓ Default' : 'Set Default';
-            selectButton.onclick = () => this.selectPrompt(prompt.id);
-            actionsDiv.appendChild(selectButton);
 
             promptElement.appendChild(promptInfo);
             promptElement.appendChild(actionsDiv);
@@ -160,10 +146,6 @@ export class SettingsUIManager {
         });
     }
 
-    private async selectPrompt(id: number): Promise<void> {
-        await PromptStore.setSelectedPrompt(id);
-        await this.refreshPromptList();
-    }
 
     private async deletePrompt(id: number): Promise<void> {
         await PromptStore.deletePrompt(id);

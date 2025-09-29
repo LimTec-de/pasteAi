@@ -13,6 +13,9 @@ export class WindowManager {
             height: config.height,
             resizable: false,
             alwaysOnTop: true,
+            transparent: false,
+            decorations: false,
+            skipTaskbar: false,
         });
 
         newWindow.once('tauri://created', () => {
@@ -107,7 +110,7 @@ export class StatusWindow {
         if (this.hideTimeout) {
             clearTimeout(this.hideTimeout);
         }
-        this.hideTimeout = setTimeout(async () => {
+        this.hideTimeout = window.setTimeout(async () => {
             const element = document.getElementById('status-message');
             if (element) {
                 element.style.display = 'none';

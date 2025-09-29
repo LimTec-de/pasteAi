@@ -1,28 +1,40 @@
-import { load } from '@tauri-apps/plugin-store';
-import { Window } from '@tauri-apps/api/window';
-import { emit } from '@tauri-apps/api/event';
+import { Window, PhysicalPosition } from '@tauri-apps/api/window';
 
-async function initializeUI() {
-    const closeWindow = document.getElementById('closeWindow') as HTMLButtonElement;
-    const openSettings = document.getElementById('openSettings') as HTMLButtonElement;
+function initializeWindowMovement(): void {
+    const windowHeader = document.querySelector('.window-header') as HTMLElement;
+    if (!windowHeader) return;
 
-    closeWindow.addEventListener('click', async () => {
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
 
-        if ((document.getElementById('doNotShowAgain') as HTMLInputElement)?.checked) {
-            const store = await load('pastai.json', { autoSave: false });
-            await store.set('show_start', false);
-            await store.save();
-        }
-
-        await (await Window.getByLabel('start'))?.close();
+    windowHeader.addEventListener('mousedown', async (e) => {
+        isDragging = true;
+        const position = await Window.getCurrent().outerPosition();
+        startX = e.clientX - position.x;
+        startY = e.clientY - position.y;
     });
 
-    openSettings.addEventListener('click', async () => {
-        await emit('open-settings-window', {});
+    window.addEventListener('mousemove', async (e) => {
+        if (!isDragging) return;
+
+        await Window.getCurrent().setPosition(new PhysicalPosition(e.clientX - startX, e.clientY - startY));
     });
 
+    window.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
 
+    // Handle close button
+    const closeButton = document.getElementById('closeButton');
+    if (closeButton) {
+        closeButton.addEventListener('click', async () => {
+            await Window.getCurrent().close();
+        });
+    }
 }
-window.addEventListener("DOMContentLoaded", async () => {
-    await initializeUI();
+
+window.addEventListener("DOMContentLoaded", () => {
+    console.log('Start window DOM loaded, initializing...');
+    initializeWindowMovement();
 });
