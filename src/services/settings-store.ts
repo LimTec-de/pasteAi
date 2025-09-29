@@ -4,7 +4,7 @@ export class SettingsStore {
     private static store: Awaited<ReturnType<typeof load>>;
 
     static async initialize(): Promise<void> {
-        this.store = await load('pastai.json', { autoSave: false });
+        this.store = await load('pastai.json', { autoSave: false, defaults: {} });
     }
 
     static async get<T>(key: string): Promise<T> {

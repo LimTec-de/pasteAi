@@ -2,7 +2,7 @@ import { onTextUpdate, startListening } from "tauri-plugin-clipboard-api";
 import clipboard from "tauri-plugin-clipboard-api";
 import { CONFIG } from '../config';
 import { Services, WindowManager } from '.';
-import { LLMService, StatusWindow, StatusType } from '.';
+import { LLMService, StatusWindow, StatusType, PromptStore } from '.';
 import { confirm } from '@tauri-apps/plugin-dialog';
 import { Window } from '@tauri-apps/api/window';
 
@@ -102,11 +102,20 @@ export class ClipboardMonitor {
         this.state.lastNotImprovedContent = newText;
 
         try {
+            // Check if there's a default prompt set
+            const defaultPrompt = await PromptStore.getDefaultPrompt();
+            let selectedPrompt = defaultPrompt;
 
-            const selectedPrompt = await WindowManager.openPromptSelector();
+            if (!selectedPrompt) {
+                // No default prompt, open selector
+                selectedPrompt = await WindowManager.openPromptSelector();
+                console.log('Selected prompt:', JSON.stringify(selectedPrompt, null, 2));
+            } else {
+                console.log(`Using default prompt: ${selectedPrompt.title}`);
+            }
 
             if (selectedPrompt) {
-                // User selected a prompt
+                // User selected a prompt or has default
                 console.log(`Selected prompt: ${selectedPrompt.title}`);
                 console.log(`Prompt text: ${selectedPrompt.prompt}`);
 

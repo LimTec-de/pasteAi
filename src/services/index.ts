@@ -14,4 +14,5 @@ export * from './llm';
 export * from './tray';
 export * from './update';
 export * from './clipboard';
+export * from './prompt-store';
 // export * from './prompt'; 

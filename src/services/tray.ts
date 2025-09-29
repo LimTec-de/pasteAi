@@ -1,15 +1,23 @@
 import { TrayIcon } from '@tauri-apps/api/tray';
-import { Menu, PredefinedMenuItem } from '@tauri-apps/api/menu';
+import { Menu, PredefinedMenuItem, Submenu, MenuItem, CheckMenuItem } from '@tauri-apps/api/menu';
 import { defaultWindowIcon } from '@tauri-apps/api/app';
 import { enable, isEnabled, disable } from '@tauri-apps/plugin-autostart';
 import { exit } from '@tauri-apps/plugin-process';
 import { Window } from '@tauri-apps/api/window';
 import { CONFIG } from '../config';
 import { WindowManager, UpdateManager } from '.';
+import { PromptStore } from './prompt-store';
+
+interface Prompt {
+    id: number;
+    title: string;
+    prompt: string;
+}
 
 
 export class TrayManager {
     private static currentMenu: Menu | null = null;
+    private static trayIcon: TrayIcon | null = null;
 
     static async initialize() {
         const isAutoStartEnabled = await isEnabled();
@@ -49,10 +57,42 @@ export class TrayManager {
             }
         };
 
-        await TrayIcon.new(options);
+        this.trayIcon = await TrayIcon.new(options);
     }
 
     private static async createMenu(isAutoStartEnabled: boolean) {
+        const prompts = await PromptStore.getAllPrompts();
+        const defaultPromptId = await PromptStore.getDefaultPromptId();
+
+        const promptItems = [
+            // "Choose every time" option
+            await CheckMenuItem.new({
+                id: 'choose_every_time',
+                text: 'Choose every time',
+                checked: defaultPromptId === "",
+                action: async () => {
+                    await PromptStore.setDefaultPromptId("");
+                    await this.refreshMenu();
+                },
+            }),
+            await PredefinedMenuItem.new({ item: 'Separator' }),
+            // All available prompts
+            ...(await Promise.all(prompts.map(async (prompt: Prompt) => await CheckMenuItem.new({
+                id: `prompt_${prompt.id}`,
+                text: prompt.title,
+                checked: defaultPromptId === prompt.id.toString(),
+                action: async () => {
+                    await PromptStore.setDefaultPromptId(prompt.id.toString());
+                    await this.refreshMenu();
+                },
+            }))))
+        ];
+
+        const promptSubmenu = await Submenu.new({
+            text: 'Default Prompt',
+            items: promptItems
+        });
+
         return await Menu.new({
             items: [
                 {
@@ -64,6 +104,7 @@ export class TrayManager {
                     },
                 },
                 await PredefinedMenuItem.new({ item: 'Separator' }),
+                promptSubmenu,
                 {
                     id: 'checkUpdates',
                     text: 'Check for Updates...',
@@ -120,5 +161,16 @@ export class TrayManager {
 
     private static async isAutoStartEnabled(): Promise<boolean> {
         return await isEnabled();
+    }
+
+    private static async refreshMenu() {
+        if (!this.trayIcon) return;
+
+        const isAutoStartEnabled = await isEnabled();
+        const newMenu = await this.createMenu(isAutoStartEnabled);
+
+        // Update the tray with the new menu
+        await this.trayIcon.setMenu(newMenu);
+        this.currentMenu = newMenu;
     }
 } 

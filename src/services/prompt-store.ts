@@ -36,6 +36,7 @@ const DEFAULT_PROMPTS: Prompt[] = [
 
 export class PromptStore {
     private static readonly SELECTED_PROMPT_KEY = 'selectedPromptId';
+    private static readonly DEFAULT_PROMPT_KEY = 'defaultPromptId';
     private static readonly PROMPTS_KEY = 'prompts';
     private static readonly USER_PROMPT_ID_START = 1000;
 
@@ -106,5 +107,25 @@ export class PromptStore {
     private static async setPrompts(prompts: Prompt[]): Promise<void> {
         await SettingsStore.set(this.PROMPTS_KEY, prompts);
         await SettingsStore.save();
+    }
+
+    static async getDefaultPromptId(): Promise<string> {
+        return await SettingsStore.get<string>(this.DEFAULT_PROMPT_KEY) ?? "";
+    }
+
+    static async setDefaultPromptId(id: string): Promise<void> {
+        await SettingsStore.set(this.DEFAULT_PROMPT_KEY, id);
+        await SettingsStore.save();
+    }
+
+    static async getDefaultPrompt(): Promise<Prompt | null> {
+        const defaultPromptId = await this.getDefaultPromptId();
+        if (defaultPromptId === "") {
+            return null; // "choose every time"
+        }
+
+        const promptId = parseInt(defaultPromptId);
+        const allPrompts = await this.getAllPrompts();
+        return allPrompts.find(p => p.id === promptId) ?? null;
     }
 } 
