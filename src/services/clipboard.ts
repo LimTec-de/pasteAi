@@ -119,7 +119,7 @@ export class ClipboardMonitor {
                 console.log(`Selected prompt: ${selectedPrompt.title}`);
                 console.log(`Prompt text: ${selectedPrompt.prompt}`);
 
-                await StatusWindow.display('Starting to improve sentence', StatusType.WORKING, false);
+                await StatusWindow.display('Improving sentence...', StatusType.WORKING, false);
 
                 this.state.lastImprovedContent = await LLMService.improveSentence(newText, services, selectedPrompt.prompt);
                 await clipboard.writeText(this.state.lastImprovedContent);
