@@ -7,17 +7,7 @@ export interface AppConfig {
 }
 
 export interface WindowConfig {
-    settings: {
-        width: number;
-        height: number;
-        title: string;
-    };
-    about: {
-        width: number;
-        height: number;
-        title: string;
-    };
-    start: {
+    dashboard: {
         width: number;
         height: number;
         title: string;
@@ -43,29 +33,19 @@ export const CONFIG: AppConfig = {
 };
 
 export const WINDOW_CONFIG: WindowConfig = {
-    settings: {
-        width: 550,
-        height: 800,
-        title: 'Settings'
-    },
-    about: {
-        width: 400,
-        height: 650,
-        title: 'About pasteAI'
-    },
-    start: {
-        width: 700,
-        height: 900,
+    dashboard: {
+        width: 980,
+        height: 820,
         title: CONFIG.APP_NAME
     },
     status: {
-        width: 300,
-        height: 50,
+        width: 360,
+        height: 92,
         title: 'Status'
     },
     'prompt': {
-        width: 600,
-        height: 500,
+        width: 720,
+        height: 560,
         title: 'Select a Prompt'
     }
-}; 
+};

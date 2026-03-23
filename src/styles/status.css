@@ -1,0 +1,101 @@
+html,
+body {
+    background: transparent;
+}
+
+body {
+    overflow: hidden;
+    padding: 12px;
+}
+
+body::before,
+body::after {
+    display: none;
+}
+
+.status-toast {
+    display: none;
+    grid-template-columns: 6px 52px minmax(0, 1fr);
+    align-items: stretch;
+    min-width: 320px;
+    max-width: 520px;
+    border-radius: 26px;
+    overflow: hidden;
+    background: rgba(255, 252, 246, 0.96);
+    border: 1px solid rgba(215, 204, 189, 0.94);
+    box-shadow: 0 24px 54px rgba(87, 55, 23, 0.18);
+}
+
+.status-toast.is-visible {
+    display: grid;
+}
+
+.status-toast__accent {
+    background: var(--color-accent);
+}
+
+.status-toast__icon {
+    display: grid;
+    place-items: center;
+    margin: 18px 0;
+    width: 52px;
+    color: var(--color-accent-strong);
+    font-size: 1.05rem;
+    font-weight: 800;
+}
+
+.status-toast__body {
+    display: grid;
+    gap: 0.3rem;
+    padding: 16px 18px 16px 8px;
+}
+
+.status-toast__label {
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+}
+
+.status-toast__message {
+    color: var(--color-text);
+    font-size: 0.94rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.status-toast__message a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+}
+
+.status-toast--ok .status-toast__accent {
+    background: var(--color-success);
+}
+
+.status-toast--ok .status-toast__icon {
+    color: var(--color-success);
+}
+
+.status-toast--working .status-toast__accent {
+    background: #b27a1f;
+}
+
+.status-toast--working .status-toast__icon {
+    color: #a46d16;
+}
+
+.status-toast--error .status-toast__accent {
+    background: #b9532e;
+}
+
+.status-toast--error .status-toast__icon {
+    color: #a14321;
+}
+
+.status-toast--info .status-toast__accent {
+    background: var(--color-accent);
+}
