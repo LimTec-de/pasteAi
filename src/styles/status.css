@@ -23,7 +23,6 @@ body::after {
     overflow: hidden;
     background: rgba(255, 252, 246, 0.96);
     border: 1px solid rgba(215, 204, 189, 0.94);
-    box-shadow: 0 24px 54px rgba(87, 55, 23, 0.18);
 }
 
 .status-toast.is-visible {
