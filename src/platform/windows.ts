@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { UserAttentionType, Window } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
@@ -183,6 +184,9 @@ export class AppWindows {
         const answerWindow = await this.ensureWindow('answer');
         const payload: AnswerDisplayPayload = { text };
         await answerWindow.emit(APP_EVENTS.ANSWER_SHOW, payload);
+        await invoke('remember_frontmost_app').catch((error) => {
+            console.warn('Could not remember frontmost app:', error);
+        });
         await this.revealWindow(answerWindow, { focus: true, promoteToFront: true });
     }
 

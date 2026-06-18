@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { invoke } from '@tauri-apps/api/core';
     import { emitTo } from '@tauri-apps/api/event';
     import { Window } from '@tauri-apps/api/window';
     import clipboard from 'tauri-plugin-clipboard-api';
@@ -18,6 +19,9 @@
 
     async function hide(): Promise<void> {
         await Window.getCurrent().hide();
+        await invoke('restore_frontmost_app').catch((error) => {
+            console.warn('Could not restore frontmost app:', error);
+        });
     }
 
     async function copyAndClose(): Promise<void> {
@@ -28,7 +32,7 @@
     }
 
     function handleCopyEvent(): void {
-        void hide();
+        window.setTimeout(() => void hide(), 0);
     }
 
     onMount(() => {

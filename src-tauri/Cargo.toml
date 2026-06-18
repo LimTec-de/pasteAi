@@ -1,6 +1,6 @@
 [package]
 name = "pasteAI"
-version = "0.11.1"
+version = "0.12.0"
 description = "AI powered clipboard improvement tool"
 authors = ["Sebastian Igerl"]
 edition = "2021"
@@ -36,6 +36,9 @@ tauri-plugin-http = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
 
 [lints.rust]
 unused_variables = "allow"
