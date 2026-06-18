@@ -4,6 +4,7 @@
     import { onMount, tick } from 'svelte';
     import { APP_EVENTS, type WindowReadyPayload } from '../../app/events';
     import type { StatusDisplayPayload, StatusType } from '../../domain/types';
+    import { centerWindowOnCursorMonitor } from '../../platform/window-placement';
 
     const STATUS_COPY: Record<StatusType, { label: string; icon: string }> = {
         error: { label: 'Attention', icon: '!' },
@@ -59,12 +60,14 @@
         }
 
         const rect = toastElement.getBoundingClientRect();
-        await Window.getCurrent().setSize(
+        const statusWindow = Window.getCurrent();
+        await statusWindow.setSize(
             new LogicalSize(
                 Math.min(Math.max(rect.width + 26, 344), 544),
                 Math.min(Math.max(rect.height + 26, 96), 204)
             )
         );
+        await centerWindowOnCursorMonitor(statusWindow);
     }
 
     onMount(() => {

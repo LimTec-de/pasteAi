@@ -4,6 +4,7 @@ import { UserAttentionType, Window } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { APP_EVENTS, type AnswerDisplayPayload, type DashboardOpenPayload, type WindowReadyPayload } from '../app/events';
 import { WINDOW_CONFIG } from '../config';
+import { centerWindowOnCursorMonitor } from './window-placement';
 import type {
     DashboardSection,
     ManagedWindowId,
@@ -87,6 +88,8 @@ const MANAGED_WINDOWS: Record<ManagedWindowId, ManagedWindowDefinition> = {
         visible: false
     }
 };
+
+const CURSOR_CENTERED_WINDOWS = new Set<ManagedWindowId>(['status', 'answer', 'prompt']);
 
 export class AppWindows {
     private readonly registry = new Map<ManagedWindowId, ManagedWindowState>();
@@ -297,6 +300,11 @@ export class AppWindows {
         const shouldTemporarilyPromote = options.promoteToFront && !originalAlwaysOnTop;
         if (shouldTemporarilyPromote) {
             await this.tryWindowCall('promote window', () => windowHandle.setAlwaysOnTop(true));
+        }
+
+        const windowLabel = windowHandle.label as ManagedWindowId;
+        if (CURSOR_CENTERED_WINDOWS.has(windowLabel)) {
+            await centerWindowOnCursorMonitor(windowHandle);
         }
 
         await this.tryWindowCall('show window', () => windowHandle.show());
