@@ -123,6 +123,10 @@ export class AppWindows {
         return this.ensureWindow('status');
     }
 
+    async prewarmAnswerWindow(): Promise<WebviewWindow> {
+        return this.ensureWindow('answer');
+    }
+
     async choosePrompt(): Promise<PromptOption | null> {
         const promptWindow = await this.ensureWindow('prompt');
         const mainWindow = Window.getCurrent();

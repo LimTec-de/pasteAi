@@ -182,8 +182,10 @@ export class ClipboardImprover {
     private async applyResult(prompt: PromptOption, improvedText: string): Promise<void> {
         if (prompt.outputMode === 'window') {
             await this.windows.hideStatus();
-            await this.windows.showAnswer(improvedText);
             this.resetRunState();
+            void this.windows.showAnswer(improvedText).catch((error) => {
+                console.error('Failed to show answer window:', error);
+            });
             return;
         }
 

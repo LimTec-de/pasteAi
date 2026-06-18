@@ -37,6 +37,9 @@ export class AppRuntime {
         void this.windows.prewarmStatusWindow().catch((error) => {
             console.error('Failed to prewarm status window:', error);
         });
+        void this.windows.prewarmAnswerWindow().catch((error) => {
+            console.error('Failed to prewarm answer window:', error);
+        });
 
         if (!await this.prompts.getDefaultPrompt()) {
             void this.windows.prewarmPromptWindow().catch((error) => {

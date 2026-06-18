@@ -1,5 +1,6 @@
 use std::process::exit;
 use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_log::{Target, TargetKind};
 use tauri_plugin_store::StoreExt;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -30,6 +31,10 @@ pub fn run() {
                 .level(log::LevelFilter::Info)
                 .level_for("tao", log::LevelFilter::Warn)
                 .level_for("tauri_plugin_updater", log::LevelFilter::Info)
+                .targets([
+                    Target::new(TargetKind::Stdout),
+                    Target::new(TargetKind::Webview),
+                ])
                 .build(),
         )
         .plugin(tauri_plugin_shell::init())
