@@ -25,7 +25,13 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
-        .plugin(tauri_plugin_log::Builder::new().build())
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .level(log::LevelFilter::Info)
+                .level_for("tao", log::LevelFilter::Warn)
+                .level_for("tauri_plugin_updater", log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .invoke_handler(tauri::generate_handler![])
