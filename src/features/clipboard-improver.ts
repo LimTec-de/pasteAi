@@ -2,7 +2,7 @@ import clipboard, { onTextUpdate, startListening } from 'tauri-plugin-clipboard-
 import { CONFIG } from '../config';
 import { PromptRepository } from '../domain/prompt-repository';
 import { ProviderGateway } from '../domain/provider-gateway';
-import type { StatusType } from '../domain/types';
+import type { PromptOption, StatusType } from '../domain/types';
 import { AppWindows } from '../platform/windows';
 
 type ClipboardRunState = 'idle' | 'awaitingPrompt' | 'improving' | 'applyingResult' | 'cooldown';
@@ -63,6 +63,12 @@ export class ClipboardImprover {
             return;
         }
 
+        const prefixMatch = this.matchTriggerPrefix(newText);
+        if (prefixMatch) {
+            await this.handlePrefixTrigger(prefixMatch.identifier, prefixMatch.body);
+            return;
+        }
+
         this.updateClipboardState(newText);
 
         if (!this.shouldImproveText(newText)) {
@@ -75,7 +81,47 @@ export class ClipboardImprover {
             return;
         }
 
-        await this.improveAndUpdateClipboard(newText);
+        await this.improveText(newText, null);
+    }
+
+    private matchTriggerPrefix(newText: string): { identifier: string | null; body: string } | null {
+        if (!newText.toLowerCase().startsWith(CONFIG.TRIGGER_PREFIX)) {
+            return null;
+        }
+
+        const afterPrefix = newText.slice(CONFIG.TRIGGER_PREFIX.length);
+        const identifierMatch = afterPrefix.match(/^([a-z0-9-]+):/i);
+        if (identifierMatch) {
+            return {
+                identifier: identifierMatch[1],
+                body: afterPrefix.slice(identifierMatch[0].length).replace(/^\s+/, '')
+            };
+        }
+
+        return { identifier: null, body: afterPrefix.replace(/^\s+/, '') };
+    }
+
+    private async handlePrefixTrigger(identifier: string | null, body: string): Promise<void> {
+        if (body.trim().length === 0) {
+            return;
+        }
+
+        if (body.length > CONFIG.MAX_TEXT_LENGTH) {
+            await this.showStatus(`Text too long (> ${CONFIG.MAX_TEXT_LENGTH} chars), skipping improvement`, 'error');
+            this.resetRunState();
+            return;
+        }
+
+        const resolvedPrompt = identifier
+            ? await this.promptRepository.getPromptByIdentifier(identifier)
+            : null;
+
+        if (resolvedPrompt) {
+            await this.improveText(body, resolvedPrompt);
+            return;
+        }
+
+        await this.improveText(identifier ? `${identifier}: ${body}` : body, null);
     }
 
     private updateClipboardState(newText: string): void {
@@ -92,9 +138,9 @@ export class ClipboardImprover {
         return this.state.copyCount >= CONFIG.COPY_THRESHOLD && newText.trim().length > 0;
     }
 
-    private async improveAndUpdateClipboard(newText: string): Promise<void> {
+    private async improveText(text: string, preselectedPrompt: PromptOption | null): Promise<void> {
         try {
-            let selectedPrompt = await this.promptRepository.getDefaultPrompt();
+            let selectedPrompt = preselectedPrompt ?? await this.promptRepository.getDefaultPrompt();
             if (!selectedPrompt) {
                 this.state.runState = 'awaitingPrompt';
                 selectedPrompt = await this.windows.choosePrompt();
@@ -110,13 +156,8 @@ export class ClipboardImprover {
                 autohide: false
             });
 
-            const improvedText = await this.providerGateway.improve(newText, selectedPrompt.prompt);
-
-            this.state.runState = 'applyingResult';
-            this.state.suppressedClipboardText = improvedText;
-            await clipboard.writeText(improvedText);
-            await this.showStatus('Improved sentence ready', 'ok');
-            this.enterCooldown();
+            const improvedText = await this.providerGateway.improve(text, selectedPrompt.prompt);
+            await this.applyResult(selectedPrompt, improvedText);
         } catch (error) {
             console.error('Error improving sentence:', error);
 
@@ -136,6 +177,21 @@ export class ClipboardImprover {
 
             this.resetRunState();
         }
+    }
+
+    private async applyResult(prompt: PromptOption, improvedText: string): Promise<void> {
+        if (prompt.outputMode === 'window') {
+            await this.windows.hideStatus();
+            await this.windows.showAnswer(improvedText);
+            this.resetRunState();
+            return;
+        }
+
+        this.state.runState = 'applyingResult';
+        this.state.suppressedClipboardText = improvedText;
+        await clipboard.writeText(improvedText);
+        await this.showStatus('Improved sentence ready', 'ok');
+        this.enterCooldown();
     }
 
     private isSuppressedClipboardWrite(newText: string): boolean {

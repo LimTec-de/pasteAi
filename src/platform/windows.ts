@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { UserAttentionType, Window } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { APP_EVENTS, type DashboardOpenPayload, type WindowReadyPayload } from '../app/events';
+import { APP_EVENTS, type AnswerDisplayPayload, type DashboardOpenPayload, type WindowReadyPayload } from '../app/events';
 import { WINDOW_CONFIG } from '../config';
 import type {
     DashboardSection,
@@ -70,6 +70,19 @@ const MANAGED_WINDOWS: Record<ManagedWindowId, ManagedWindowDefinition> = {
         transparent: true,
         decorations: false,
         skipTaskbar: true,
+        visible: false
+    },
+    answer: {
+        label: 'answer',
+        url: '/answer.html',
+        title: WINDOW_CONFIG.answer.title,
+        width: WINDOW_CONFIG.answer.width,
+        height: WINDOW_CONFIG.answer.height,
+        resizable: true,
+        alwaysOnTop: true,
+        transparent: false,
+        decorations: false,
+        skipTaskbar: false,
         visible: false
     }
 };
@@ -160,6 +173,13 @@ export class AppWindows {
         }
 
         await statusWindow.emit(APP_EVENTS.STATUS_HIDE);
+    }
+
+    async showAnswer(text: string): Promise<void> {
+        const answerWindow = await this.ensureWindow('answer');
+        const payload: AnswerDisplayPayload = { text };
+        await answerWindow.emit(APP_EVENTS.ANSWER_SHOW, payload);
+        await this.revealWindow(answerWindow, { focus: true, promoteToFront: true });
     }
 
     private async ensureWindow(windowId: ManagedWindowId): Promise<WebviewWindow> {

@@ -1,6 +1,6 @@
 export type ProviderId = 'pasteai' | 'openai' | 'ollama';
 
-export type ManagedWindowId = 'dashboard' | 'prompt' | 'status';
+export type ManagedWindowId = 'dashboard' | 'prompt' | 'status' | 'answer';
 
 export type DashboardSection = 'welcome' | 'providers' | 'prompts' | 'about';
 
@@ -15,10 +15,14 @@ export interface AppSettings {
     showStart: boolean;
 }
 
+export type PromptOutputMode = 'clipboard' | 'window';
+
 export interface PromptOption {
     id: number;
     title: string;
     prompt: string;
+    identifier: string;
+    outputMode: PromptOutputMode;
 }
 
 export type StatusType = 'error' | 'ok' | 'working' | 'info';

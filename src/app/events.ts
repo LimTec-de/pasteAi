@@ -13,6 +13,7 @@ export const APP_EVENTS = {
     PROMPT_CANCELLED: 'prompt:cancelled',
     STATUS_SHOW: 'status:show',
     STATUS_HIDE: 'status:hide',
+    ANSWER_SHOW: 'answer:show',
     SETTINGS_CHANGED: 'settings:changed',
     PROMPTS_CHANGED: 'prompts:changed'
 } as const;
@@ -25,6 +26,10 @@ export interface DashboardOpenPayload {
     section: DashboardSection;
 }
 
+export interface AnswerDisplayPayload {
+    text: string;
+}
+
 export interface AppEventPayloads {
     [APP_EVENTS.WINDOW_READY]: WindowReadyPayload;
     [APP_EVENTS.DASHBOARD_OPEN]: DashboardOpenPayload;
@@ -33,6 +38,7 @@ export interface AppEventPayloads {
     [APP_EVENTS.PROMPT_CANCELLED]: undefined;
     [APP_EVENTS.STATUS_SHOW]: StatusDisplayPayload;
     [APP_EVENTS.STATUS_HIDE]: undefined;
+    [APP_EVENTS.ANSWER_SHOW]: AnswerDisplayPayload;
     [APP_EVENTS.SETTINGS_CHANGED]: undefined;
     [APP_EVENTS.PROMPTS_CHANGED]: undefined;
 }

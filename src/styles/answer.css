@@ -1,0 +1,39 @@
+.answer-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    height: calc(100vh - 61px);
+    padding: 22px 24px 24px;
+    box-sizing: border-box;
+}
+
+.answer-shell__hint {
+    color: var(--color-muted);
+    font-size: 0.85rem;
+}
+
+.answer-shell__textarea {
+    flex: 1;
+    width: 100%;
+    min-height: 180px;
+    resize: none;
+    padding: 0.9rem 1rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.answer-shell__textarea:focus {
+    outline: none;
+    border-color: var(--color-accent);
+}
+
+.answer-shell__footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.8rem;
+}

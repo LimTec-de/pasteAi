@@ -6,7 +6,8 @@
     "main",
     "dashboard",
     "prompt",
-    "status"
+    "status",
+    "answer"
   ],
   "permissions": [
     {

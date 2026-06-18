@@ -35,7 +35,8 @@ export default defineConfig(async () => ({
         main: './index.html',
         dashboard: './dashboard.html',
         prompt: './prompt.html',
-        status: './status.html'
+        status: './status.html',
+        answer: './answer.html'
       }
     }
   }

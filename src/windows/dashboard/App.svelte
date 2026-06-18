@@ -8,7 +8,7 @@
     import { PromptRepository } from '../../domain/prompt-repository';
     import { DEFAULT_SETTINGS, SettingsRepository } from '../../domain/settings-repository';
     import { ProviderGateway } from '../../domain/provider-gateway';
-    import type { AppSettings, DashboardSection, PromptOption, ProviderId } from '../../domain/types';
+    import type { AppSettings, DashboardSection, PromptOption, PromptOutputMode, ProviderId } from '../../domain/types';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -26,11 +26,15 @@
     let previousSelectedPromptId: number | null = null;
     let promptTitle = '';
     let promptText = '';
+    let promptIdentifier = '';
+    let promptOutputMode: PromptOutputMode = 'clipboard';
     let promptEditorError = '';
 
     let editTitle = '';
     let editText = '';
+    let editIdentifier = '';
     let inlineEditId: number | null = null;
+    let inlineEditError = '';
 
     let quotaMessage = '';
     let quotaIsError = false;
@@ -57,13 +61,15 @@
         inlineEditId = selectedPrompt.id;
         editTitle = selectedPrompt.title;
         editText = selectedPrompt.prompt;
+        editIdentifier = selectedPrompt.identifier;
+        inlineEditError = '';
     }
 
     $: canSaveInlineEdit = !!selectedPrompt
         && !selectedPromptIsBuiltIn
         && editTitle.trim().length > 0
         && editText.trim().length > 0
-        && (editTitle !== selectedPrompt.title || editText !== selectedPrompt.prompt);
+        && (editTitle !== selectedPrompt.title || editText !== selectedPrompt.prompt || editIdentifier !== selectedPrompt.identifier);
 
     function setActiveSection(section: DashboardSection): void {
         activeSection = section;
@@ -238,6 +244,8 @@
         editingPromptId = prompt?.id ?? null;
         promptTitle = prompt?.title ?? '';
         promptText = prompt?.prompt ?? '';
+        promptIdentifier = prompt?.identifier ?? '';
+        promptOutputMode = prompt?.outputMode ?? 'clipboard';
         promptEditorError = '';
         promptEditorVisible = true;
     }
@@ -251,6 +259,8 @@
         previousSelectedPromptId = null;
         promptTitle = '';
         promptText = '';
+        promptIdentifier = '';
+        promptOutputMode = 'clipboard';
         promptEditorError = '';
         promptEditorVisible = false;
     }
@@ -263,15 +273,20 @@
             return;
         }
 
-        if (editingPromptId !== null) {
-            await promptRepository.updatePrompt(editingPromptId, title, prompt);
-            await refreshPromptState(editingPromptId);
-        } else {
-            const beforeIds = new Set((await promptRepository.getAllPrompts()).map((entry) => entry.id));
-            await promptRepository.addPrompt(title, prompt);
-            const updatedPrompts = await promptRepository.getAllPrompts();
-            const newestPrompt = updatedPrompts.find((entry) => !beforeIds.has(entry.id)) ?? null;
-            await refreshPromptState(newestPrompt?.id ?? null);
+        try {
+            if (editingPromptId !== null) {
+                await promptRepository.updatePrompt(editingPromptId, title, prompt, promptIdentifier.trim(), promptOutputMode);
+                await refreshPromptState(editingPromptId);
+            } else {
+                const beforeIds = new Set((await promptRepository.getAllPrompts()).map((entry) => entry.id));
+                await promptRepository.addPrompt(title, prompt, promptIdentifier.trim(), promptOutputMode);
+                const updatedPrompts = await promptRepository.getAllPrompts();
+                const newestPrompt = updatedPrompts.find((entry) => !beforeIds.has(entry.id)) ?? null;
+                await refreshPromptState(newestPrompt?.id ?? null);
+            }
+        } catch (error) {
+            promptEditorError = error instanceof Error ? error.message : 'Could not save the prompt.';
+            return;
         }
 
         closePromptEditor();
@@ -306,7 +321,26 @@
 
         editTitle = editTitle.trim();
         editText = editText.trim();
-        await promptRepository.updatePrompt(selectedPrompt.id, editTitle, editText);
+        const identifier = editIdentifier.trim();
+
+        try {
+            await promptRepository.updatePrompt(selectedPrompt.id, editTitle, editText, identifier, selectedPrompt.outputMode);
+        } catch (error) {
+            inlineEditError = error instanceof Error ? error.message : 'Could not save the prompt.';
+            return;
+        }
+
+        inlineEditError = '';
+        await refreshPromptState(selectedPrompt.id);
+        await emitTo('main', APP_EVENTS.PROMPTS_CHANGED);
+    }
+
+    async function handleOutputModeChange(mode: PromptOutputMode): Promise<void> {
+        if (!selectedPrompt || selectedPrompt.outputMode === mode) {
+            return;
+        }
+
+        await promptRepository.setOutputMode(selectedPrompt.id, mode);
         await refreshPromptState(selectedPrompt.id);
         await emitTo('main', APP_EVENTS.PROMPTS_CHANGED);
     }
@@ -404,6 +438,25 @@
                                     <p>The improved text replaces your clipboard, ready to paste anywhere.</p>
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="welcome-shortcut panel-card fade-up">
+                            <div class="section-heading">
+                                <span class="section-kicker">Shortcut</span>
+                                <h3>Trigger with a prefix instead of triple-copying</h3>
+                                <p>Start your copied text with <code>pasteai:</code> and pasteAI steps in after a single copy.</p>
+                            </div>
+                            <ul class="welcome-shortcut__list">
+                                <li>
+                                    <code>pasteai: your text</code>
+                                    <span>Uses your default prompt (or asks which one to use).</span>
+                                </li>
+                                <li>
+                                    <code>pasteai:grammar: your text</code>
+                                    <span>Targets a specific prompt by its <strong>identifier</strong> &mdash; here, <code>grammar</code>.</span>
+                                </li>
+                            </ul>
+                            <p class="welcome-shortcut__note">Every prompt has an identifier shown in the Prompt Library. Built-in ones use names like <code>grammar</code>, <code>linkedin</code>, or <code>email</code>; for your own prompts you can pick any short name. The prefix is removed before the text is sent.</p>
                         </div>
 
                         <div class="welcome-tips fade-up">
@@ -563,7 +616,7 @@
                                 <div class="prompt-detail-stack">
                                     {#if showPromptEmptyState}
                                         <div class="detail-empty">Select a prompt to view its instructions, or create a new custom mode.</div>
-                                    {:else if showPromptPreview}
+                                    {:else if showPromptPreview && selectedPrompt}
                                         <article class="panel-card prompt-preview is-visible">
                                             {#if selectedPromptIsBuiltIn}
                                                 <div class="section-heading">
@@ -572,6 +625,17 @@
                                                     <p>A built-in mode that ships with pasteAI.</p>
                                                 </div>
                                                 <div class="prompt-preview__body">{selectedPrompt.prompt}</div>
+                                                <div class="prompt-identifier-note">
+                                                    <span class="meta-label">Identifier</span>
+                                                    <code>pasteai:{selectedPrompt.identifier}:</code>
+                                                </div>
+                                                <div class="output-mode">
+                                                    <span class="meta-label">When done</span>
+                                                    <div class="output-mode__options">
+                                                        <button class:is-active={selectedPrompt.outputMode === 'clipboard'} type="button" on:click={() => void handleOutputModeChange('clipboard')}>Auto-copy</button>
+                                                        <button class:is-active={selectedPrompt.outputMode === 'window'} type="button" on:click={() => void handleOutputModeChange('window')}>Show window</button>
+                                                    </div>
+                                                </div>
                                                 <div class="prompt-preview__actions">
                                                     {#if !selectedPromptIsDefault}
                                                         <button class="app-button app-button--primary" type="button" on:click={() => void setDefaultPrompt()}>Set as default</button>
@@ -593,6 +657,13 @@
                                                         <input id="editTitle" type="text" bind:value={editTitle} placeholder="Example: Sharpen for email">
                                                     </div>
                                                     <div>
+                                                        <label class="field-label" for="editIdentifier">
+                                                            <strong>Identifier</strong>
+                                                            <span>Used in the clipboard prefix, e.g. <code>pasteai:{editIdentifier.trim() || 'name'}:</code></span>
+                                                        </label>
+                                                        <input id="editIdentifier" type="text" bind:value={editIdentifier} placeholder="Example: email">
+                                                    </div>
+                                                    <div>
                                                         <label class="field-label" for="editText">
                                                             <strong>Instructions</strong>
                                                             <span>How pasteAI should rewrite the copied text.</span>
@@ -600,6 +671,16 @@
                                                         <textarea id="editText" bind:value={editText} placeholder="Tell pasteAI how to improve the copied text."></textarea>
                                                     </div>
                                                 </div>
+                                                <div class="output-mode">
+                                                    <span class="meta-label">When done</span>
+                                                    <div class="output-mode__options">
+                                                        <button class:is-active={selectedPrompt.outputMode === 'clipboard'} type="button" on:click={() => void handleOutputModeChange('clipboard')}>Auto-copy</button>
+                                                        <button class:is-active={selectedPrompt.outputMode === 'window'} type="button" on:click={() => void handleOutputModeChange('window')}>Show window</button>
+                                                    </div>
+                                                </div>
+                                                {#if inlineEditError}
+                                                    <div class="status is-visible status--error">{inlineEditError}</div>
+                                                {/if}
                                                 <div class="prompt-preview__actions">
                                                     {#if !selectedPromptIsDefault}
                                                         <button class="app-button app-button--primary" type="button" on:click={() => void setDefaultPrompt()}>Set as default</button>
@@ -629,11 +710,27 @@
                                                 </div>
 
                                                 <div>
+                                                    <label class="field-label" for="promptIdentifier">
+                                                        <strong>Identifier</strong>
+                                                        <span>Used in the clipboard prefix, e.g. <code>pasteai:{promptIdentifier.trim() || 'name'}:</code> Leave blank to derive it from the title.</span>
+                                                    </label>
+                                                    <input id="promptIdentifier" type="text" bind:value={promptIdentifier} placeholder="Example: email">
+                                                </div>
+
+                                                <div>
                                                     <label class="field-label" for="promptText">
                                                         <strong>Prompt instructions</strong>
                                                         <span>Describe the tone, structure, and constraints for the rewrite.</span>
                                                     </label>
                                                     <textarea id="promptText" bind:value={promptText} placeholder="Tell pasteAI how to improve the copied text."></textarea>
+                                                </div>
+                                            </div>
+
+                                            <div class="output-mode">
+                                                <span class="meta-label">When done</span>
+                                                <div class="output-mode__options">
+                                                    <button class:is-active={promptOutputMode === 'clipboard'} type="button" on:click={() => promptOutputMode = 'clipboard'}>Auto-copy</button>
+                                                    <button class:is-active={promptOutputMode === 'window'} type="button" on:click={() => promptOutputMode = 'window'}>Show window</button>
                                                 </div>
                                             </div>
 
