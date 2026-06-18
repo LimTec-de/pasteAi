@@ -345,56 +345,56 @@
 
             <section class="dashboard-panel">
                 <section bind:this={welcomeSectionElement} class:active={activeSection === 'welcome'} class="dashboard-section">
-                    <section class="surface-card start-hero fade-up">
-                        <div class="start-hero__copy">
+                    <div class="welcome">
+                        <div class="welcome-hero fade-up">
                             <span class="eyebrow">Clipboard utility</span>
                             <h2 class="display-title">Three quick copies. Cleaner writing.</h2>
-                            <p>pasteAI stays out of your way until you deliberately ask for help. Select text, triple-copy, and get a polished version back in the clipboard without leaving the app you are already using.</p>
+                            <p class="lede">pasteAI stays out of your way until you ask for help. Select text, triple-copy, and get a polished version back in your clipboard without leaving the app you are already using.</p>
                             <div class="start-actions">
-                                <button class="app-button app-button--primary" type="button" on:click={() => setActiveSection('providers')}>Open provider setup</button>
-                                <button class="app-button app-button--secondary" type="button" on:click={() => setActiveSection('prompts')}>Manage prompt library</button>
+                                <button class="app-button app-button--primary" type="button" on:click={() => setActiveSection('providers')}>Set up a provider</button>
+                                <button class="app-button app-button--secondary" type="button" on:click={() => setActiveSection('prompts')}>Manage prompts</button>
+                            </div>
+                            <label class="start-toggle">
+                                <input type="checkbox" bind:checked={settings.showStart} on:change={() => void handleShowStartToggle()}>
+                                <span>Show this welcome guide when pasteAI starts</span>
+                            </label>
+                        </div>
+
+                        <div class="welcome-steps fade-up">
+                            <div class="welcome-step">
+                                <span class="welcome-step__num">1</span>
+                                <div>
+                                    <strong>Copy the text</strong>
+                                    <p>Select a sentence or paragraph and copy it like you normally would.</p>
+                                </div>
+                            </div>
+                            <div class="welcome-step">
+                                <span class="welcome-step__num">2</span>
+                                <div>
+                                    <strong>Repeat the copy</strong>
+                                    <p>Copy the same selection twice more to confirm you want pasteAI to step in.</p>
+                                </div>
+                            </div>
+                            <div class="welcome-step">
+                                <span class="welcome-step__num">3</span>
+                                <div>
+                                    <strong>Paste the result</strong>
+                                    <p>The improved text replaces your clipboard, ready to paste anywhere.</p>
+                                </div>
                             </div>
                         </div>
 
-                        <aside class="start-hero__panel">
-                            <span class="meta-label">Launch behavior</span>
-                            <strong>Open this welcome section on app launch.</strong>
-                            <label class="start-toggle">
-                                <input type="checkbox" bind:checked={settings.showStart} on:change={() => void handleShowStartToggle()}>
-                                <span>Show the welcome guide when pasteAI starts</span>
-                            </label>
-                            <span class="chip">Tray-first desktop app</span>
-                        </aside>
-                    </section>
-
-                    <section class="start-step-grid">
-                        <article class="surface-card start-step fade-up">
-                            <span class="start-step__number">1</span>
-                            <h3>Copy the original text</h3>
-                            <p>Select a sentence, paragraph, or draft you want to improve and copy it like you normally would.</p>
-                        </article>
-                        <article class="surface-card start-step fade-up">
-                            <span class="start-step__number">2</span>
-                            <h3>Repeat the copy gesture</h3>
-                            <p>Copy the same selection twice more within a moment to confirm that you want pasteAI to step in.</p>
-                        </article>
-                        <article class="surface-card start-step fade-up">
-                            <span class="start-step__number">3</span>
-                            <h3>Paste the refined version</h3>
-                            <p>The improved text replaces the clipboard automatically, ready to paste wherever you were writing.</p>
-                        </article>
-                    </section>
-
-                    <section class="start-callout-grid fade-up">
-                        <article class="callout-card start-callout">
-                            <h3>Keep it private when needed</h3>
-                            <p>Switch to Ollama when you want text improvements to stay on your own machine.</p>
-                        </article>
-                        <article class="callout-card start-callout">
-                            <h3>Choose the writing style each time</h3>
-                            <p>Clear the default prompt if you want to pick a mode per clipboard run.</p>
-                        </article>
-                    </section>
+                        <div class="welcome-tips fade-up">
+                            <article class="callout-card start-callout">
+                                <h3>Keep it private</h3>
+                                <p>Switch to Ollama to keep text improvements on your own machine.</p>
+                            </article>
+                            <article class="callout-card start-callout">
+                                <h3>Pick a style each time</h3>
+                                <p>Clear the default prompt to choose a mode per clipboard run.</p>
+                            </article>
+                        </div>
+                    </div>
                 </section>
 
                 <section bind:this={providersSectionElement} class:active={activeSection === 'providers'} class="dashboard-section">
@@ -603,20 +603,16 @@
 
                 <section bind:this={aboutSectionElement} class:active={activeSection === 'about'} class="dashboard-section">
                     <div class="about-shell">
-                        <section class="surface-card about-hero fade-up">
+                        <div class="about-hero fade-up">
                             <div class="about-mark">PA</div>
                             <div class="about-copy">
                                 <span class="eyebrow">Desktop writing utility</span>
                                 <h2 class="display-title">Clipboard improvement without the ceremony.</h2>
-                                <p>pasteAI is a compact desktop tool for polishing text where you already work. Choose a provider, shape the output with prompts, and trigger rewrites with a deliberate triple-copy gesture.</p>
-                                <div class="about-links">
-                                    <a href="https://github.com/LimTec-de/pasteAi" class="app-button app-button--primary" target="_blank">View on GitHub</a>
-                                    <a href="https://github.com/LimTec-de/pasteAi/blob/master/LEGAL.md" class="app-button app-button--secondary" target="_blank">Legal information</a>
-                                </div>
+                                <p>Choose a provider, shape the output with prompts, and trigger rewrites with a deliberate triple-copy gesture.</p>
                             </div>
-                        </section>
+                        </div>
 
-                        <section class="about-meta fade-up">
+                        <div class="about-meta fade-up">
                             <article class="panel-card">
                                 <span class="section-kicker">Version</span>
                                 <h3>{version}</h3>
@@ -625,21 +621,16 @@
                             <article class="panel-card">
                                 <span class="section-kicker">Providers</span>
                                 <h3>PasteAI, OpenAI, or Ollama</h3>
-                                <p>Use a managed account, your own API key, or a local model depending on privacy and workflow needs.</p>
+                                <p>A managed account, your own API key, or a local model.</p>
                             </article>
-                        </section>
+                        </div>
 
-                        <section class="surface-card panel-card fade-up">
-                            <div class="section-heading">
-                                <span class="section-kicker">Further links</span>
-                                <h2>Support, legal, and company details</h2>
-                                <p>Everything related to licensing, contact, and terms is grouped here for quick access.</p>
-                            </div>
-                            <div class="about-links">
-                                <a href="https://www.limtec.de/#imprint" class="app-button app-button--ghost" target="_blank">Imprint</a>
-                                <a href="https://openai.com/policies/terms-of-use" class="app-button app-button--ghost" target="_blank">OpenAI terms</a>
-                            </div>
-                        </section>
+                        <div class="about-links fade-up">
+                            <a href="https://github.com/LimTec-de/pasteAi" class="app-button app-button--primary" target="_blank">View on GitHub</a>
+                            <a href="https://github.com/LimTec-de/pasteAi/blob/master/LEGAL.md" class="app-button app-button--secondary" target="_blank">Legal</a>
+                            <a href="https://www.limtec.de/#imprint" class="app-button app-button--ghost" target="_blank">Imprint</a>
+                            <a href="https://openai.com/policies/terms-of-use" class="app-button app-button--ghost" target="_blank">OpenAI terms</a>
+                        </div>
                     </div>
                 </section>
             </section>

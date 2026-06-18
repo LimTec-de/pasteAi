@@ -20,22 +20,20 @@
     justify-content: space-between;
     gap: 1rem;
     width: 100%;
-    padding: 1rem 1.15rem;
+    padding: 0.85rem 1rem;
     text-align: left;
-    border-radius: var(--radius-lg);
-    border: 1px solid rgba(215, 204, 189, 0.95);
-    background: rgba(255, 252, 246, 0.95);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
     cursor: pointer;
     transition:
-        transform var(--transition-standard),
-        box-shadow var(--transition-standard),
+        background-color var(--transition-standard),
         border-color var(--transition-standard);
 }
 
 .prompt-item:hover {
-    transform: translateY(-2px);
-    border-color: rgba(201, 106, 61, 0.34);
-    box-shadow: var(--shadow-hover);
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
 }
 
 .prompt-item__topline {
@@ -66,10 +64,10 @@
 .prompt-shell__empty {
     padding: 1.4rem;
     text-align: center;
-    border-radius: var(--radius-lg);
-    border: 1px dashed rgba(215, 204, 189, 0.95);
+    border-radius: var(--radius-md);
+    border: 1px dashed var(--color-border-strong);
     color: var(--color-muted);
-    background: rgba(248, 242, 232, 0.46);
+    background: var(--color-surface-raised);
 }
 
 @media (max-width: 760px) {
