@@ -574,7 +574,6 @@
     border-radius: var(--radius-md);
     background: var(--color-surface-raised);
     border: 1px solid var(--color-border);
-    overflow-x: auto;
 }
 
 .shell-snippet__code code {
@@ -583,7 +582,8 @@
     background: none;
     font-size: 0.82rem;
     line-height: 1.5;
-    white-space: pre;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 @media (max-width: 860px) {
