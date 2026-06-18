@@ -13,6 +13,7 @@ export interface AppSettings {
     appId: string;
     email: string;
     showStart: boolean;
+    improveHtml: boolean;
 }
 
 export type PromptOutputMode = 'clipboard' | 'window';

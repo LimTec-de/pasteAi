@@ -1,10 +1,19 @@
-import clipboard, { getAvailableTypes, onTextUpdate, readHtml, readRtf, startListening } from 'tauri-plugin-clipboard-api';
-import { info } from '@tauri-apps/plugin-log';
+import clipboard, { getAvailableTypes, onTextUpdate, readHtml, startListening } from 'tauri-plugin-clipboard-api';
+// Diagnostics logging (disabled). Re-add `readRtf` above and uncomment the import
+// below together with logClipboardDiagnostics to re-enable raw clipboard logging.
+// import { info } from '@tauri-apps/plugin-log';
 import { CONFIG } from '../config';
+import { htmlToImprovableText } from '../domain/clipboard-html';
 import { PromptRepository } from '../domain/prompt-repository';
 import { ProviderGateway } from '../domain/provider-gateway';
+import { SettingsRepository } from '../domain/settings-repository';
 import type { PromptOption, StatusType } from '../domain/types';
 import { AppWindows } from '../platform/windows';
+
+interface ImproveInput {
+    text: string;
+    html: string | null;
+}
 
 type ClipboardRunState = 'idle' | 'awaitingPrompt' | 'improving' | 'applyingResult' | 'cooldown';
 
@@ -32,7 +41,8 @@ export class ClipboardImprover {
     constructor(
         private readonly promptRepository: PromptRepository,
         private readonly providerGateway: ProviderGateway,
-        private readonly windows: AppWindows
+        private readonly windows: AppWindows,
+        private readonly settingsRepository: SettingsRepository
     ) { }
 
     async start(): Promise<void> {
@@ -44,7 +54,8 @@ export class ClipboardImprover {
     }
 
     private async handleClipboardUpdate(newText: string): Promise<void> {
-        await this.logClipboardDiagnostics(newText);
+        // Diagnostics logging (disabled). Uncomment to inspect raw clipboard formats.
+        // await this.logClipboardDiagnostics(newText);
 
         if (this.isSuppressedClipboardWrite(newText)) {
             this.state.suppressedClipboardText = null;
@@ -84,39 +95,57 @@ export class ClipboardImprover {
             return;
         }
 
-        await this.improveText(newText, null);
+        const html = await this.readClipboardHtmlIfAny();
+        await this.improveText({ text: newText, html }, null);
     }
 
-    private async logClipboardDiagnostics(receivedText: string): Promise<void> {
+    private async readClipboardHtmlIfAny(): Promise<string | null> {
         try {
-            const lines = [
-                `[clipboard] update received (runState=${this.state.runState}, ${receivedText.length} chars)`,
-                `  text/plain: ${this.previewForLog(receivedText)}`
-            ];
-
             const available = await getAvailableTypes();
-            lines.push(`  available formats: ${JSON.stringify(available)}`);
-
-            if (available.html) {
-                lines.push(`  text/html: ${this.previewForLog(await readHtml())}`);
+            if (!available.html) {
+                return null;
             }
 
-            if (available.rtf) {
-                lines.push(`  text/rtf: ${this.previewForLog(await readRtf())}`);
-            }
-
-            await info(lines.join('\n'));
+            const html = await readHtml();
+            return html.trim().length > 0 ? html : null;
         } catch (error) {
-            console.warn('Could not log clipboard diagnostics:', error);
+            console.warn('Could not read clipboard HTML:', error);
+            return null;
         }
     }
 
-    private previewForLog(value: string, maxLength = 4000): string {
-        const preview = value.length > maxLength
-            ? `${value.slice(0, maxLength)}… [truncated ${value.length - maxLength} chars]`
-            : value;
-        return JSON.stringify(preview);
-    }
+    // Diagnostics logging (disabled). Uncomment this block plus the call in
+    // handleClipboardUpdate and the `info`/`readRtf` imports to re-enable.
+    // private async logClipboardDiagnostics(receivedText: string): Promise<void> {
+    //     try {
+    //         const lines = [
+    //             `[clipboard] update received (runState=${this.state.runState}, ${receivedText.length} chars)`,
+    //             `  text/plain: ${this.previewForLog(receivedText)}`
+    //         ];
+    //
+    //         const available = await getAvailableTypes();
+    //         lines.push(`  available formats: ${JSON.stringify(available)}`);
+    //
+    //         if (available.html) {
+    //             lines.push(`  text/html: ${this.previewForLog(await readHtml())}`);
+    //         }
+    //
+    //         if (available.rtf) {
+    //             lines.push(`  text/rtf: ${this.previewForLog(await readRtf())}`);
+    //         }
+    //
+    //         await info(lines.join('\n'));
+    //     } catch (error) {
+    //         console.warn('Could not log clipboard diagnostics:', error);
+    //     }
+    // }
+    //
+    // private previewForLog(value: string, maxLength = 4000): string {
+    //     const preview = value.length > maxLength
+    //         ? `${value.slice(0, maxLength)}… [truncated ${value.length - maxLength} chars]`
+    //         : value;
+    //     return JSON.stringify(preview);
+    // }
 
     private matchTriggerPrefix(newText: string): { identifier: string | null; body: string } | null {
         if (!newText.toLowerCase().startsWith(CONFIG.TRIGGER_PREFIX)) {
@@ -151,11 +180,11 @@ export class ClipboardImprover {
             : null;
 
         if (resolvedPrompt) {
-            await this.improveText(body, resolvedPrompt);
+            await this.improveText({ text: body, html: null }, resolvedPrompt);
             return;
         }
 
-        await this.improveText(identifier ? `${identifier}: ${body}` : body, null);
+        await this.improveText({ text: identifier ? `${identifier}: ${body}` : body, html: null }, null);
     }
 
     private updateClipboardState(newText: string): void {
@@ -172,7 +201,7 @@ export class ClipboardImprover {
         return this.state.copyCount >= CONFIG.COPY_THRESHOLD && newText.trim().length > 0;
     }
 
-    private async improveText(text: string, preselectedPrompt: PromptOption | null): Promise<void> {
+    private async improveText(input: ImproveInput, preselectedPrompt: PromptOption | null): Promise<void> {
         try {
             let selectedPrompt = preselectedPrompt ?? await this.promptRepository.getDefaultPrompt();
             if (!selectedPrompt) {
@@ -185,12 +214,21 @@ export class ClipboardImprover {
                 return;
             }
 
+            const useHtml = await this.shouldImproveAsHtml(input, selectedPrompt);
+
             this.state.runState = 'improving';
             await this.showStatus('Improving sentence...', 'working', {
                 autohide: false
             });
 
-            const improvedText = await this.providerGateway.improve(text, selectedPrompt.prompt);
+            if (useHtml && input.html) {
+                const improvedHtml = await this.providerGateway.improveHtml(input.html, selectedPrompt.prompt);
+                await this.applyHtmlResult(improvedHtml);
+                return;
+            }
+
+            const sourceText = input.html ? htmlToImprovableText(input.html) : input.text;
+            const improvedText = await this.providerGateway.improve(sourceText, selectedPrompt.prompt);
             await this.applyResult(selectedPrompt, improvedText);
         } catch (error) {
             console.error('Error improving sentence:', error);
@@ -226,6 +264,28 @@ export class ClipboardImprover {
         this.state.runState = 'applyingResult';
         this.state.suppressedClipboardText = improvedText;
         await clipboard.writeText(improvedText);
+        await this.showStatus('Improved sentence ready', 'ok');
+        this.enterCooldown();
+    }
+
+    private async shouldImproveAsHtml(input: ImproveInput, prompt: PromptOption): Promise<boolean> {
+        if (!input.html || prompt.outputMode !== 'clipboard') {
+            return false;
+        }
+
+        if (input.html.length > CONFIG.MAX_HTML_LENGTH) {
+            return false;
+        }
+
+        return this.settingsRepository.get('improveHtml');
+    }
+
+    private async applyHtmlResult(improvedHtml: string): Promise<void> {
+        const plainText = htmlToImprovableText(improvedHtml);
+
+        this.state.runState = 'applyingResult';
+        this.state.suppressedClipboardText = plainText;
+        await clipboard.writeHtmlAndText(improvedHtml, plainText);
         await this.showStatus('Improved sentence ready', 'ok');
         this.enterCooldown();
     }

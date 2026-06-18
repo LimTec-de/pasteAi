@@ -20,7 +20,7 @@ export class AppRuntime {
     private readonly providers = new ProviderGateway(this.settings, (title, body) => this.notifier.notify(title, body));
     private readonly updates = new UpdateService((title, body) => this.notifier.notify(title, body));
     private readonly tray = new TrayController(this.prompts, this.windows, this.updates);
-    private readonly clipboard = new ClipboardImprover(this.prompts, this.providers, this.windows);
+    private readonly clipboard = new ClipboardImprover(this.prompts, this.providers, this.windows, this.settings);
 
     async start(): Promise<void> {
         await this.settings.initialize();

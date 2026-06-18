@@ -46,6 +46,8 @@
     "clipboard:allow-has-html",
     "clipboard:read-all",
     "clipboard:allow-write-text",
+    "clipboard:allow-write-html",
+    "clipboard:allow-write-html-and-text",
     "core:webview:allow-create-webview-window",
     "autostart:allow-enable",
     "autostart:allow-disable",

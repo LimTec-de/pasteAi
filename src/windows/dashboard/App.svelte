@@ -237,6 +237,10 @@
         await updateSettings({ showStart: settings.showStart });
     }
 
+    async function handleImproveHtmlToggle(): Promise<void> {
+        await updateSettings({ improveHtml: settings.improveHtml });
+    }
+
     async function handleLogin(): Promise<void> {
         if (!settings.email.trim()) {
             loginMessage = 'Please enter an email address';
@@ -608,6 +612,13 @@
                             <span class="section-kicker">Prompt Library</span>
                             <h2>Curate the writing modes available to pasteAI.</h2>
                             <p>Built-in prompts stay read-only, while custom prompts can be edited, deleted, and set as the default mode.</p>
+                        </div>
+
+                        <div class="panel-card">
+                            <label class="start-toggle">
+                                <input type="checkbox" bind:checked={settings.improveHtml} on:change={() => void handleImproveHtmlToggle()}>
+                                <span>Improve as rich text (HTML) to keep tables, styles, and links from apps like Teams, Word, and Excel. Emojis are preserved either way. Default is plain text.</span>
+                            </label>
                         </div>
 
                         <div class="prompt-workspace">

@@ -45,6 +45,21 @@ export class ProviderGateway {
         return improved.trim();
     }
 
+    async improveHtml(html: string, systemPrompt: string): Promise<string> {
+        const settings = await this.settingsRepository.getAll();
+        this.syncOpenAIClient(settings);
+
+        const composedPrompt = `${systemPrompt}\n\nThe input is an HTML fragment. Apply your instructions only to the visible text content. Preserve every HTML tag, attribute, inline style, emoji, image, link, list, and table exactly as given. Do not add, remove, or reorder elements. Output only the resulting HTML fragment with no explanation and no markdown code fences.`;
+
+        const improved = await this.requestImprovement(html, composedPrompt, settings);
+        return this.stripCodeFences(improved).trim();
+    }
+
+    private stripCodeFences(value: string): string {
+        const fenced = value.trim().match(/^```(?:html)?\s*\n?([\s\S]*?)\n?```$/i);
+        return fenced ? fenced[1] : value;
+    }
+
     private async requestImprovement(text: string, systemPrompt: string, settings: AppSettings): Promise<string> {
         switch (settings.llmType) {
             case 'pasteai':

@@ -9,7 +9,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     defaultPromptId: null,
     appId: '',
     email: '',
-    showStart: true
+    showStart: true,
+    improveHtml: true
 };
 
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
@@ -20,7 +21,8 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     defaultPromptId: 'defaultPromptId',
     appId: 'appId',
     email: 'email',
-    showStart: 'showStart'
+    showStart: 'showStart',
+    improveHtml: 'improveHtml'
 };
 
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
@@ -161,6 +163,8 @@ export class SettingsRepository {
                 return (value === null ? null : DEFAULT_SETTINGS.defaultPromptId) as AppSettings[K];
             case 'showStart':
                 return (typeof value === 'boolean' ? value : DEFAULT_SETTINGS.showStart) as AppSettings[K];
+            case 'improveHtml':
+                return (typeof value === 'boolean' ? value : DEFAULT_SETTINGS.improveHtml) as AppSettings[K];
             default:
                 return DEFAULT_SETTINGS[key];
         }
