@@ -4,6 +4,7 @@
     import { Window } from '@tauri-apps/api/window';
     import clipboard from 'tauri-plugin-clipboard-api';
     import { onMount } from 'svelte';
+    import { SHELL_INSTALL_COMMANDS } from '../../config';
     import { APP_EVENTS, type DashboardOpenPayload, type WindowReadyPayload } from '../../app/events';
     import { AppStore } from '../../domain/store';
     import { PromptRepository } from '../../domain/prompt-repository';
@@ -53,8 +54,8 @@
     let shellSectionElement: HTMLElement | null = null;
     let aboutSectionElement: HTMLElement | null = null;
 
-    const shellBashCommand = `printf '\\n%s\\n' 'p(){ printf "\\033]52;c;%s\\007" "$(printf "pasteai:shell:%s" "$*" | base64 | tr -d "\\n")"; }' >> ~/.bashrc && source ~/.bashrc`;
-    const shellZshCommand = `printf '\\n%s\\n' 'p(){ printf "\\033]52;c;%s\\007" "$(printf "pasteai:shell:%s" "$*" | base64 | tr -d "\\n")"; }' >> ~/.zshrc && source ~/.zshrc`;
+    const shellBashCommand = SHELL_INSTALL_COMMANDS.bash;
+    const shellZshCommand = SHELL_INSTALL_COMMANDS.zsh;
     let copiedShellCommand: 'bash' | 'zsh' | null = null;
     let copiedShellTimeout: number | null = null;
 
@@ -416,7 +417,7 @@
                     Prompt Library
                 </button>
                 <button class:active={activeSection === 'shell'} type="button" on:click={() => setActiveSection('shell')}>
-                    Shell
+                    Shell integration
                 </button>
                 <button class:active={activeSection === 'about'} type="button" on:click={() => setActiveSection('about')}>
                     About

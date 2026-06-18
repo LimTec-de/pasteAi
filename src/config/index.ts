@@ -39,6 +39,11 @@ export const CONFIG: AppConfig = {
     APP_NAME: 'pasteAI'
 };
 
+export const SHELL_INSTALL_COMMANDS: Record<'bash' | 'zsh', string> = {
+    bash: `printf '\\n%s\\n' 'p(){ printf "\\033]52;c;%s\\007" "$(printf "pasteai:shell:%s" "$*" | base64 | tr -d "\\n")"; }' >> ~/.bashrc && source ~/.bashrc`,
+    zsh: `printf '\\n%s\\n' 'p(){ printf "\\033]52;c;%s\\007" "$(printf "pasteai:shell:%s" "$*" | base64 | tr -d "\\n")"; }' >> ~/.zshrc && source ~/.zshrc`
+};
+
 export const WINDOW_CONFIG: WindowConfig = {
     dashboard: {
         width: 980,

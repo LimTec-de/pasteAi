@@ -1,4 +1,5 @@
-import clipboard, { onTextUpdate, startListening } from 'tauri-plugin-clipboard-api';
+import clipboard, { getAvailableTypes, onTextUpdate, readHtml, readRtf, startListening } from 'tauri-plugin-clipboard-api';
+import { info } from '@tauri-apps/plugin-log';
 import { CONFIG } from '../config';
 import { PromptRepository } from '../domain/prompt-repository';
 import { ProviderGateway } from '../domain/provider-gateway';
@@ -43,6 +44,8 @@ export class ClipboardImprover {
     }
 
     private async handleClipboardUpdate(newText: string): Promise<void> {
+        await this.logClipboardDiagnostics(newText);
+
         if (this.isSuppressedClipboardWrite(newText)) {
             this.state.suppressedClipboardText = null;
             this.enterCooldown();
@@ -82,6 +85,37 @@ export class ClipboardImprover {
         }
 
         await this.improveText(newText, null);
+    }
+
+    private async logClipboardDiagnostics(receivedText: string): Promise<void> {
+        try {
+            const lines = [
+                `[clipboard] update received (runState=${this.state.runState}, ${receivedText.length} chars)`,
+                `  text/plain: ${this.previewForLog(receivedText)}`
+            ];
+
+            const available = await getAvailableTypes();
+            lines.push(`  available formats: ${JSON.stringify(available)}`);
+
+            if (available.html) {
+                lines.push(`  text/html: ${this.previewForLog(await readHtml())}`);
+            }
+
+            if (available.rtf) {
+                lines.push(`  text/rtf: ${this.previewForLog(await readRtf())}`);
+            }
+
+            await info(lines.join('\n'));
+        } catch (error) {
+            console.warn('Could not log clipboard diagnostics:', error);
+        }
+    }
+
+    private previewForLog(value: string, maxLength = 4000): string {
+        const preview = value.length > maxLength
+            ? `${value.slice(0, maxLength)}… [truncated ${value.length - maxLength} chars]`
+            : value;
+        return JSON.stringify(preview);
     }
 
     private matchTriggerPrefix(newText: string): { identifier: string | null; body: string } | null {

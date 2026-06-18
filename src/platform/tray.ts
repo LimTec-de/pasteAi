@@ -3,9 +3,11 @@ import { CheckMenuItem, Menu, PredefinedMenuItem, Submenu } from '@tauri-apps/ap
 import { TrayIcon } from '@tauri-apps/api/tray';
 import { disable, enable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { exit } from '@tauri-apps/plugin-process';
+import clipboard from 'tauri-plugin-clipboard-api';
 import { AppWindows } from './windows';
 import { PromptRepository } from '../domain/prompt-repository';
 import { UpdateService } from './updates';
+import { SHELL_INSTALL_COMMANDS } from '../config';
 
 export class TrayController {
     private trayIcon: TrayIcon | null = null;
@@ -72,6 +74,28 @@ export class TrayController {
             items: promptItems
         });
 
+        const shellSubmenu = await Submenu.new({
+            text: 'Shell integration',
+            items: [
+                {
+                    id: 'shell_open',
+                    text: 'How it works',
+                    action: () => this.windows.openDashboard('shell')
+                },
+                await PredefinedMenuItem.new({ item: 'Separator' }),
+                {
+                    id: 'shell_copy_bash',
+                    text: 'Copy install command (bash)',
+                    action: () => void clipboard.writeText(SHELL_INSTALL_COMMANDS.bash)
+                },
+                {
+                    id: 'shell_copy_zsh',
+                    text: 'Copy install command (zsh)',
+                    action: () => void clipboard.writeText(SHELL_INSTALL_COMMANDS.zsh)
+                }
+            ]
+        });
+
         return Menu.new({
             items: [
                 {
@@ -84,11 +108,7 @@ export class TrayController {
                     text: 'Settings',
                     action: () => this.windows.openDashboard('providers')
                 },
-                {
-                    id: 'shell',
-                    text: 'Shell integration',
-                    action: () => this.windows.openDashboard('shell')
-                },
+                shellSubmenu,
                 {
                     id: 'about',
                     text: 'About',
