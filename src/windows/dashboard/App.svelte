@@ -28,6 +28,10 @@
     let promptText = '';
     let promptEditorError = '';
 
+    let editTitle = '';
+    let editText = '';
+    let inlineEditId: number | null = null;
+
     let quotaMessage = '';
     let quotaIsError = false;
     let loginMessage = '';
@@ -48,6 +52,18 @@
     $: selectedPromptIsDefault = selectedPrompt ? selectedPrompt.id === defaultPromptId : false;
     $: showPromptPreview = !!selectedPrompt && !(promptEditorVisible && editingPromptId === null);
     $: showPromptEmptyState = !selectedPrompt && !(promptEditorVisible && editingPromptId === null);
+
+    $: if (selectedPrompt && selectedPrompt.id !== inlineEditId) {
+        inlineEditId = selectedPrompt.id;
+        editTitle = selectedPrompt.title;
+        editText = selectedPrompt.prompt;
+    }
+
+    $: canSaveInlineEdit = !!selectedPrompt
+        && !selectedPromptIsBuiltIn
+        && editTitle.trim().length > 0
+        && editText.trim().length > 0
+        && (editTitle !== selectedPrompt.title || editText !== selectedPrompt.prompt);
 
     function setActiveSection(section: DashboardSection): void {
         activeSection = section;
@@ -283,9 +299,15 @@
         await emitTo('main', APP_EVENTS.PROMPTS_CHANGED);
     }
 
-    async function clearDefaultPrompt(): Promise<void> {
-        await promptRepository.setDefaultPromptId(null);
-        await refreshPromptState(selectedPromptId);
+    async function saveInlineEdit(): Promise<void> {
+        if (!selectedPrompt || selectedPromptIsBuiltIn || !canSaveInlineEdit) {
+            return;
+        }
+
+        editTitle = editTitle.trim();
+        editText = editText.trim();
+        await promptRepository.updatePrompt(selectedPrompt.id, editTitle, editText);
+        await refreshPromptState(selectedPrompt.id);
         await emitTo('main', APP_EVENTS.PROMPTS_CHANGED);
     }
 
@@ -516,20 +538,21 @@
                                     <div class="prompt-list-toolbar">
                                         <div>
                                             <span class="meta-label">Library</span>
-                                            <div class="muted-copy">Select a prompt to preview it.</div>
+                                            <div class="muted-copy">Choose a prompt to view it.</div>
                                         </div>
                                         <button class="app-button app-button--primary" type="button" on:click={() => openPromptEditor()}>New prompt</button>
                                     </div>
                                     <div class="prompt-list">
                                         {#each prompts as prompt}
+                                            {@const isBuiltIn = prompt.id < 1000}
+                                            {@const isDefault = defaultPromptId === prompt.id}
                                             <button class:is-selected={selectedPromptId === prompt.id} class="prompt-item" type="button" on:click={() => selectedPromptId = prompt.id}>
-                                                <div class="prompt-item__topline">
-                                                    <div class="prompt-item__title">{prompt.title}</div>
-                                                    <span class={`chip ${prompt.id < 1000 ? 'chip--muted' : ''}`}>
-                                                        {defaultPromptId === prompt.id ? 'Default' : prompt.id < 1000 ? 'Built-in' : 'Custom'}
-                                                    </span>
-                                                </div>
-                                                <div class="prompt-item__excerpt">{prompt.prompt}</div>
+                                                <div class="prompt-item__title">{prompt.title}</div>
+                                                {#if isDefault}
+                                                    <span class="chip chip--success">Default</span>
+                                                {:else if !isBuiltIn}
+                                                    <span class="chip">Custom</span>
+                                                {/if}
                                             </button>
                                         {/each}
                                     </div>
@@ -539,23 +562,52 @@
                             <div class="prompt-detail">
                                 <div class="prompt-detail-stack">
                                     {#if showPromptEmptyState}
-                                        <div class="detail-empty">Select a prompt to inspect its instructions or create a new custom mode.</div>
+                                        <div class="detail-empty">Select a prompt to view its instructions, or create a new custom mode.</div>
                                     {:else if showPromptPreview}
                                         <article class="panel-card prompt-preview is-visible">
-                                            <div class="section-heading">
-                                                <span class={`chip ${selectedPromptIsDefault ? 'chip--success' : selectedPromptIsBuiltIn ? 'chip--muted' : ''}`}>
-                                                    {selectedPromptIsDefault ? 'Default prompt' : selectedPromptIsBuiltIn ? 'Built-in prompt' : 'Custom prompt'}
-                                                </span>
-                                                <h2>{selectedPrompt.title}</h2>
-                                                <p>{selectedPromptIsBuiltIn ? 'A built-in mode that ships with pasteAI.' : 'A custom mode you created for your own workflow.'}</p>
-                                            </div>
-                                            <div class="prompt-preview__body">{selectedPrompt.prompt}</div>
-                                            <div class="prompt-preview__actions">
-                                                <button class="app-button app-button--primary" type="button" disabled={selectedPromptIsDefault} on:click={() => void setDefaultPrompt()}>Use as default</button>
-                                                <button class="app-button app-button--secondary" type="button" disabled={defaultPromptId === null} on:click={() => void clearDefaultPrompt()}>Choose every time</button>
-                                                <button class="app-button app-button--secondary" type="button" disabled={selectedPromptIsBuiltIn} on:click={() => openPromptEditor(selectedPrompt)}>Edit prompt</button>
-                                                <button class="app-button app-button--ghost" type="button" disabled={selectedPromptIsBuiltIn} on:click={() => void deleteSelectedPrompt()}>Delete</button>
-                                            </div>
+                                            {#if selectedPromptIsBuiltIn}
+                                                <div class="section-heading">
+                                                    <span class="chip chip--muted">Built-in prompt</span>
+                                                    <h2>{selectedPrompt.title}</h2>
+                                                    <p>A built-in mode that ships with pasteAI.</p>
+                                                </div>
+                                                <div class="prompt-preview__body">{selectedPrompt.prompt}</div>
+                                                <div class="prompt-preview__actions">
+                                                    {#if !selectedPromptIsDefault}
+                                                        <button class="app-button app-button--primary" type="button" on:click={() => void setDefaultPrompt()}>Set as default</button>
+                                                    {/if}
+                                                </div>
+                                                <p class="prompt-preview__note">Built-in prompts can't be edited.</p>
+                                            {:else}
+                                                <div class="section-heading">
+                                                    <span class={`chip ${selectedPromptIsDefault ? 'chip--success' : ''}`}>
+                                                        {selectedPromptIsDefault ? 'Default prompt' : 'Custom prompt'}
+                                                    </span>
+                                                </div>
+                                                <div class="prompt-editor__fields">
+                                                    <div>
+                                                        <label class="field-label" for="editTitle">
+                                                            <strong>Title</strong>
+                                                            <span>Shown in the prompt picker.</span>
+                                                        </label>
+                                                        <input id="editTitle" type="text" bind:value={editTitle} placeholder="Example: Sharpen for email">
+                                                    </div>
+                                                    <div>
+                                                        <label class="field-label" for="editText">
+                                                            <strong>Instructions</strong>
+                                                            <span>How pasteAI should rewrite the copied text.</span>
+                                                        </label>
+                                                        <textarea id="editText" bind:value={editText} placeholder="Tell pasteAI how to improve the copied text."></textarea>
+                                                    </div>
+                                                </div>
+                                                <div class="prompt-preview__actions">
+                                                    {#if !selectedPromptIsDefault}
+                                                        <button class="app-button app-button--primary" type="button" on:click={() => void setDefaultPrompt()}>Set as default</button>
+                                                    {/if}
+                                                    <button class="app-button app-button--secondary" type="button" disabled={!canSaveInlineEdit} on:click={() => void saveInlineEdit()}>Save</button>
+                                                    <button class="app-button app-button--ghost" type="button" on:click={() => void deleteSelectedPrompt()}>Delete</button>
+                                                </div>
+                                            {/if}
                                         </article>
                                     {/if}
 
@@ -564,7 +616,7 @@
                                             <div class="section-heading">
                                                 <span class="section-kicker">Prompt editor</span>
                                                 <h2>{editingPromptId === null ? 'Create a custom prompt' : 'Edit custom prompt'}</h2>
-                                                <p>Custom prompts appear in the selector window and can be used as the default mode.</p>
+                                                <p>Custom prompts appear in the selector window and can be set as the default mode.</p>
                                             </div>
 
                                             <div class="prompt-editor__fields">
