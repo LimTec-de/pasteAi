@@ -1,5 +1,8 @@
 packages:
   - .
 
-onlyBuiltDependencies:
-  - esbuild
+allowBuilds:
+  esbuild: true
+
+overrides:
+  valibot: 1.2.0
