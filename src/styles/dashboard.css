@@ -518,6 +518,74 @@
     gap: 0.4rem;
 }
 
+.shell-steps,
+.shell-install {
+    display: grid;
+    gap: 1rem;
+}
+
+.shell-steps__list {
+    list-style: none;
+    display: grid;
+    gap: 0.7rem;
+    margin: 0;
+    padding: 0;
+}
+
+.shell-steps__list li {
+    display: grid;
+    gap: 0.3rem;
+}
+
+.shell-steps__list span {
+    color: var(--color-muted);
+    font-size: 0.88rem;
+    line-height: 1.5;
+}
+
+.shell-steps code,
+.shell-install code {
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    font-size: 0.82rem;
+}
+
+.shell-steps__list code {
+    justify-self: start;
+}
+
+.shell-snippet {
+    display: grid;
+    gap: 0.5rem;
+}
+
+.shell-snippet__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.shell-snippet__code {
+    margin: 0;
+    padding: 0.85rem 1rem;
+    border-radius: var(--radius-md);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    overflow-x: auto;
+}
+
+.shell-snippet__code code {
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    white-space: pre;
+}
+
 @media (max-width: 860px) {
     .dashboard-layout {
         grid-template-columns: 1fr;

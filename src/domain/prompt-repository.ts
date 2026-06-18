@@ -36,6 +36,13 @@ export const DEFAULT_PROMPTS: PromptOption[] = [
         outputMode: 'clipboard',
         title: 'Email professional tone',
         prompt: 'Act as an email communication expert. Rewrite this text to be appropriate for a professional email. Ensure it has a clear structure with proper greeting and sign-off if needed. Make it polite, concise, and professional while maintaining the original message and intent. Improve clarity and formality without making it overly stiff or formal. Do not answer questions or add new information. Improve the sentences without changing the language.'
+    },
+    {
+        id: 5,
+        identifier: 'shell',
+        outputMode: 'window',
+        title: 'Shell command helper',
+        prompt: 'Act as a shell command generator for macOS and Linux (bash/zsh). Convert the request into a single runnable command line. Chain steps with &&. When the task needs input (e.g. a commit message), use read, like: read -r -p "Commit message: " MESSAGE. Be conservative and never produce destructive commands (for example rm -rf, git reset --hard, force pushes, dropping databases, or overwriting files). If the request would be destructive, output only a single echo explaining why, e.g. echo "Refusing: removing all branches is destructive". If you are missing information needed to build the command, output only a single echo asking for it, e.g. echo "I need the remote name to do the push". Otherwise output only the raw command with no explanation, no comments, and no markdown code fences or backticks. Do not add a trailing newline. If the input is already a valid, non-destructive shell command, return it unchanged.'
     }
 ];
 

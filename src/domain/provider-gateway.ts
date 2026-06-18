@@ -41,6 +41,11 @@ export class ProviderGateway {
         const settings = await this.settingsRepository.getAll();
         this.syncOpenAIClient(settings);
 
+        const improved = await this.requestImprovement(text, systemPrompt, settings);
+        return improved.trim();
+    }
+
+    private async requestImprovement(text: string, systemPrompt: string, settings: AppSettings): Promise<string> {
         switch (settings.llmType) {
             case 'pasteai':
                 return this.improveWithPasteAI(text, systemPrompt);

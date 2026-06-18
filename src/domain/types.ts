@@ -2,7 +2,7 @@ export type ProviderId = 'pasteai' | 'openai' | 'ollama';
 
 export type ManagedWindowId = 'dashboard' | 'prompt' | 'status' | 'answer';
 
-export type DashboardSection = 'welcome' | 'providers' | 'prompts' | 'about';
+export type DashboardSection = 'welcome' | 'providers' | 'prompts' | 'shell' | 'about';
 
 export interface AppSettings {
     llmType: ProviderId;

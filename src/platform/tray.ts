@@ -85,6 +85,11 @@ export class TrayController {
                     action: () => this.windows.openDashboard('providers')
                 },
                 {
+                    id: 'shell',
+                    text: 'Shell integration',
+                    action: () => this.windows.openDashboard('shell')
+                },
+                {
                     id: 'about',
                     text: 'About',
                     action: () => this.windows.openDashboard('about')

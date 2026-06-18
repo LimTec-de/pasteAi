@@ -2,6 +2,7 @@
     import { emitTo } from '@tauri-apps/api/event';
     import { getVersion } from '@tauri-apps/api/app';
     import { Window } from '@tauri-apps/api/window';
+    import clipboard from 'tauri-plugin-clipboard-api';
     import { onMount } from 'svelte';
     import { APP_EVENTS, type DashboardOpenPayload, type WindowReadyPayload } from '../../app/events';
     import { AppStore } from '../../domain/store';
@@ -49,7 +50,25 @@
     let welcomeSectionElement: HTMLElement | null = null;
     let providersSectionElement: HTMLElement | null = null;
     let promptsSectionElement: HTMLElement | null = null;
+    let shellSectionElement: HTMLElement | null = null;
     let aboutSectionElement: HTMLElement | null = null;
+
+    const shellBashCommand = `printf '\\n%s\\n' 'p(){ printf "\\033]52;c;%s\\007" "$(printf "pasteai:shell:%s" "$*" | base64 | tr -d "\\n")"; }' >> ~/.bashrc && source ~/.bashrc`;
+    const shellZshCommand = `printf '\\n%s\\n' 'p(){ printf "\\033]52;c;%s\\007" "$(printf "pasteai:shell:%s" "$*" | base64 | tr -d "\\n")"; }' >> ~/.zshrc && source ~/.zshrc`;
+    let copiedShellCommand: 'bash' | 'zsh' | null = null;
+    let copiedShellTimeout: number | null = null;
+
+    async function copyShellCommand(shell: 'bash' | 'zsh', command: string): Promise<void> {
+        await clipboard.writeText(command);
+        copiedShellCommand = shell;
+        if (copiedShellTimeout !== null) {
+            window.clearTimeout(copiedShellTimeout);
+        }
+        copiedShellTimeout = window.setTimeout(() => {
+            copiedShellCommand = null;
+            copiedShellTimeout = null;
+        }, 1500);
+    }
 
     $: selectedPrompt = prompts.find((prompt) => prompt.id === selectedPromptId) ?? null;
     $: selectedPromptIsBuiltIn = selectedPrompt ? selectedPrompt.id < 1000 : false;
@@ -92,6 +111,8 @@
                 return providersSectionElement;
             case 'prompts':
                 return promptsSectionElement;
+            case 'shell':
+                return shellSectionElement;
             case 'about':
                 return aboutSectionElement;
         }
@@ -393,6 +414,9 @@
                 </button>
                 <button class:active={activeSection === 'prompts'} type="button" on:click={() => setActiveSection('prompts')}>
                     Prompt Library
+                </button>
+                <button class:active={activeSection === 'shell'} type="button" on:click={() => setActiveSection('shell')}>
+                    Shell
                 </button>
                 <button class:active={activeSection === 'about'} type="button" on:click={() => setActiveSection('about')}>
                     About
@@ -746,6 +770,65 @@
                                     {/if}
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section bind:this={shellSectionElement} class:active={activeSection === 'shell'} class="dashboard-section">
+                    <div class="dashboard-section__panel">
+                        <div class="section-heading">
+                            <span class="section-kicker">Shell integration</span>
+                            <h2>Turn plain English into shell commands.</h2>
+                            <p>Add a tiny <code>p</code> helper to your shell, then type what you want and pasteAI returns the command.</p>
+                        </div>
+
+                        <div class="shell-steps panel-card">
+                            <div class="section-heading">
+                                <span class="section-kicker">How it works</span>
+                                <h3>Type <code>p</code> followed by your request</h3>
+                            </div>
+                            <ul class="shell-steps__list">
+                                <li>
+                                    <code>p git push and commit</code>
+                                    <span>The helper copies <code>pasteai:shell:git push and commit</code> to your clipboard using the OSC 52 terminal escape.</span>
+                                </li>
+                                <li>
+                                    <span>pasteAI detects the prefix, generates the command, and shows it in a result window for you to review before running.</span>
+                                </li>
+                            </ul>
+                        </div>
+
+                        <div class="shell-install panel-card">
+                            <div class="section-heading">
+                                <span class="section-kicker">Install the helper</span>
+                                <h3>Paste one line into your shell</h3>
+                                <p>This appends the <code>p</code> function to your shell config and loads it right away, so it works in the same session.</p>
+                            </div>
+
+                            <div class="shell-snippet">
+                                <div class="shell-snippet__head">
+                                    <span class="meta-label">bash</span>
+                                    <button class="app-button app-button--secondary" type="button" on:click={() => void copyShellCommand('bash', shellBashCommand)}>
+                                        {copiedShellCommand === 'bash' ? 'Copied' : 'Copy'}
+                                    </button>
+                                </div>
+                                <pre class="shell-snippet__code"><code>{shellBashCommand}</code></pre>
+                            </div>
+
+                            <div class="shell-snippet">
+                                <div class="shell-snippet__head">
+                                    <span class="meta-label">zsh</span>
+                                    <button class="app-button app-button--secondary" type="button" on:click={() => void copyShellCommand('zsh', shellZshCommand)}>
+                                        {copiedShellCommand === 'zsh' ? 'Copied' : 'Copy'}
+                                    </button>
+                                </div>
+                                <pre class="shell-snippet__code"><code>{shellZshCommand}</code></pre>
+                            </div>
+                        </div>
+
+                        <div class="status-note status-note--warning">
+                            <div class="chip chip--muted">Terminal</div>
+                            <div>The <code>p</code> helper needs a terminal that supports OSC 52 clipboard writes (iTerm2, kitty, WezTerm, recent xterm). iTerm2 may require enabling "Allow clipboard access". macOS Terminal.app does not support it by default, and inside tmux you need <code>set -g set-clipboard on</code>.</div>
                         </div>
                     </div>
                 </section>
