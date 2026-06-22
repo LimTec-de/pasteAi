@@ -2,6 +2,7 @@
   "name": "pasteai",
   "private": true,
   "version": "0.12.1",
+  "packageManager": "pnpm@11.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
