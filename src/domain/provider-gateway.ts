@@ -3,6 +3,7 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { CONFIG } from '../config';
 import { SettingsRepository } from './settings-repository';
 import type { AppSettings, PasteAIQuota } from './types';
+import { transcriptionLanguages } from './types';
 import { improveWithApple } from './apple-system';
 
 interface PasteAIErrorResponse {
@@ -193,7 +194,7 @@ export class ProviderGateway {
                             transcription: {
                                 model: 'gpt-transcribe',
                                 prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
-                                languages: ['de', 'en']
+                                languages: transcriptionLanguages(settings.dictateLanguage)
                             },
                             turn_detection: null
                         }

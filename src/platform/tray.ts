@@ -111,7 +111,7 @@ export class TrayController {
                 {
                     id: 'dictate_shortcut',
                     text: 'Dictate shortcut…',
-                    action: () => this.windows.openDashboard('providers')
+                    action: () => this.windows.openDashboard('dictation')
                 },
                 shellSubmenu,
                 {

@@ -17,5 +17,6 @@ commands.allow = [
     "apple_improve",
     "apple_dictation_start",
     "apple_dictation_stop",
-    "apple_dictation_cancel"
+    "apple_dictation_cancel",
+    "apple_list_input_devices"
 ]

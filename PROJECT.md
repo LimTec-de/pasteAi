@@ -1,11 +1,14 @@
 # PROJECT
 
 ## Hold-to-dictate shortcut — 2026-08-27
-- Dedicated global shortcut (`dictateShortcut`, default `CommandOrControl+Shift+Space`). Hold = listen, release = clipboard + paste. Short tap (<450ms) keeps overlay open (already recording) with Done → restore remembered app + paste. Both flows write the clipboard then Cmd/Ctrl+V. Second shortcut press also finishes (must run before `isBusy`, because dictation sets runState `dictating`). Overlay/settings/welcome mention insert and copy. Never register Copy/C. Do not preview-commit while holding.
+- Dedicated global shortcut (`dictateShortcut`, default `CommandOrControl+Shift+Space`). Hold = listen, release = clipboard + paste (`dictateOutputMode=insert` default) or copy only (`clipboard`). Short tap (<450ms) keeps overlay open with Done. Both insert flows write clipboard then Cmd/Ctrl+V. Second shortcut press also finishes (must run before `isBusy`). Never register Copy/C. Do not preview-commit while holding.
 - Overlay must not take focus (`showDictate` focus false + immediate `restore_frontmost_app`) or `Released` from tauri-plugin-global-shortcut 2.3.2 is unreliable
 - `frontmost.rs`: remember macOS pid / Windows HWND; `paste_into_frontmost` restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it
 - Triple-empty-copy / `copy_observer.rs` removed. Dictation uses `dictationProvider` (`openai` default, `apple` on-device SpeechAnalyzer). Rewrite `llmType` can be `apple` (Foundation Models). No silent fallback; unavailable options are disabled in Settings.
 - Mic: `src-tauri/Info.plist` `NSMicrophoneUsageDescription` + `Entitlements.plist` `audio-input`/`microphone`
+
+## Dictation settings tab — 2026-08-27
+- Dashboard section `dictation` (tray `Dictate shortcut…`). Engine cards stay on `providers`. Keys: `dictateLanguage` `auto|de|en` (OpenAI auto=`["de","en"]`; Apple auto=`Locale.current` via `supportedLocale(equivalentTo:)`; de/en fail if Apple has no equivalent), `dictateMicrophoneId` empty=default (OpenAI Chromium `deviceId`, Apple CoreAudio UID + `kAudioOutputUnitProperty_CurrentDevice` on input-only `AVAudioEngine`, never HAL default input), `dictateOutputMode` `insert|clipboard`. Command `apple_list_input_devices`. Missing API key / Apple unavailable still open `providers`.
 
 ## Mac on-device AI — 2026-08-27
 - Rewrite `llmType=apple`: Foundation Models via Swift C-ABI `src-tauri/macos/PasteAIApple.swift`. Dictation `dictationProvider=apple`: SpeechAnalyzer + SpeechTranscriber, native AVAudioEngine (overlay does not getUserMedia). Availability probed; Settings cards disabled with reason; no silent OpenAI fallback. Weak-link FoundationModels/Speech. `MACOSX_DEPLOYMENT_TARGET`/`minimumSystemVersion` 13.0 — Rust default 11.0 makes ld emit `@rpath/libswift_Concurrency.dylib` (TBD `$ld$previous`). Also `-Wl,-rpath,/usr/lib/swift`. Commands `allow-apple-system`. Plist `NSSpeechRecognitionUsageDescription`.

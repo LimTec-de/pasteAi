@@ -24,8 +24,8 @@ export async function improveWithApple(systemPrompt: string, text: string): Prom
     return invoke<string>('apple_improve', { systemPrompt, text });
 }
 
-export async function startAppleDictation(): Promise<void> {
-    await invoke('apple_dictation_start');
+export async function startAppleDictation(language?: string, deviceUid?: string): Promise<void> {
+    await invoke('apple_dictation_start', { language, deviceUid });
 }
 
 export async function stopAppleDictation(): Promise<string> {
@@ -34,4 +34,13 @@ export async function stopAppleDictation(): Promise<string> {
 
 export async function cancelAppleDictation(): Promise<void> {
     await invoke('apple_dictation_cancel');
+}
+
+export interface AudioInputDevice {
+    id: string;
+    label: string;
+}
+
+export async function listAppleInputDevices(): Promise<AudioInputDevice[]> {
+    return invoke<AudioInputDevice[]>('apple_list_input_devices');
 }

@@ -2,9 +2,13 @@ export type ProviderId = 'pasteai' | 'openai' | 'ollama' | 'apple';
 
 export type DictationProviderId = 'openai' | 'apple';
 
+export type DictateLanguage = 'auto' | 'de' | 'en';
+
+export type DictateOutputMode = 'insert' | 'clipboard';
+
 export type ManagedWindowId = 'dashboard' | 'prompt' | 'status' | 'answer' | 'dictate';
 
-export type DashboardSection = 'welcome' | 'providers' | 'prompts' | 'shell' | 'about';
+export type DashboardSection = 'welcome' | 'providers' | 'dictation' | 'prompts' | 'shell' | 'about';
 
 export interface AppSettings {
     llmType: ProviderId;
@@ -18,6 +22,13 @@ export interface AppSettings {
     improveHtml: boolean;
     dictateShortcut: string;
     dictationProvider: DictationProviderId;
+    dictateLanguage: DictateLanguage;
+    dictateMicrophoneId: string;
+    dictateOutputMode: DictateOutputMode;
+}
+
+export function transcriptionLanguages(language: DictateLanguage): string[] {
+    return language === 'auto' ? ['de', 'en'] : [language];
 }
 
 export type PromptOutputMode = 'clipboard' | 'window';

@@ -8,6 +8,7 @@ import { ProviderGateway } from '../domain/provider-gateway';
 import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import type { StatusType } from '../domain/types';
+import { transcriptionLanguages } from '../domain/types';
 import { AppWindows } from '../platform/windows';
 import { ClipboardImprover } from './clipboard-improver';
 
@@ -137,6 +138,9 @@ export class DictationController {
     private async beginSession(): Promise<void> {
         const settings = await this.settingsRepository.getAll();
         const shortcut = settings.dictateShortcut.trim() || CONFIG.DEFAULT_DICTATE_SHORTCUT;
+        const languages = transcriptionLanguages(settings.dictateLanguage);
+        const microphoneId = settings.dictateMicrophoneId.trim();
+        const outputMode = settings.dictateOutputMode;
 
         if (settings.dictationProvider === 'apple') {
             const availability = await getAppleSpeechAvailability();
@@ -155,13 +159,19 @@ export class DictationController {
             });
 
             try {
-                await startAppleDictation();
+                await startAppleDictation(settings.dictateLanguage, microphoneId);
                 if (this.cancelled) {
                     await cancelAppleDictation().catch(() => undefined);
                     return;
                 }
 
-                await this.windows.showDictate({ engine: 'apple', shortcut });
+                await this.windows.showDictate({
+                    engine: 'apple',
+                    shortcut,
+                    languages,
+                    microphoneId,
+                    outputMode
+                });
                 await invoke('restore_frontmost_app').catch((error) => {
                     console.warn('Could not restore frontmost app:', error);
                 });
@@ -204,7 +214,14 @@ export class DictationController {
                 return;
             }
 
-            await this.windows.showDictate({ engine: 'openai', clientSecret, shortcut });
+            await this.windows.showDictate({
+                engine: 'openai',
+                clientSecret,
+                shortcut,
+                languages,
+                microphoneId,
+                outputMode
+            });
             await invoke('restore_frontmost_app').catch((error) => {
                 console.warn('Could not restore frontmost app:', error);
             });
@@ -252,6 +269,16 @@ export class DictationController {
 
         this.clipboardImprover.suppressNextWrite(transcript);
         await clipboard.writeText(transcript);
+
+        const outputMode = await this.settingsRepository.get('dictateOutputMode');
+        if (outputMode === 'clipboard') {
+            await invoke('restore_frontmost_app').catch((error) => {
+                console.warn('Could not restore frontmost app:', error);
+            });
+            await this.showStatus('Copied', 'ok');
+            this.clipboardImprover.enterWriteCooldown();
+            return;
+        }
 
         try {
             await invoke('paste_into_frontmost');

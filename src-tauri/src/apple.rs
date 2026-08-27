@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 #[derive(Debug, Clone, Serialize)]
@@ -12,6 +12,12 @@ pub struct AppleAvailability {
 #[derive(Clone, Serialize)]
 pub struct AppleDictateLevel {
     pub level: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioInputDevice {
+    pub id: String,
+    pub label: String,
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -64,17 +70,34 @@ pub async fn apple_improve(system_prompt: String, text: String) -> Result<String
 }
 
 #[tauri::command]
-pub async fn apple_dictation_start(app: AppHandle) -> Result<(), String> {
+pub async fn apple_dictation_start(
+    app: AppHandle,
+    language: Option<String>,
+    device_uid: Option<String>,
+) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        return blocking(move || macos::dictation_start(app)).await?;
+        let language = language.unwrap_or_default();
+        let device_uid = device_uid.unwrap_or_default();
+        return blocking(move || macos::dictation_start(app, &language, &device_uid)).await?;
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = app;
+        let _ = (app, language, device_uid);
         Err("Only available on Mac.".to_string())
     }
+}
+
+#[tauri::command]
+pub async fn apple_list_input_devices() -> Result<Vec<AudioInputDevice>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return blocking(macos::list_input_devices).await?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    Ok(Vec::new())
 }
 
 #[tauri::command]
@@ -120,7 +143,7 @@ fn join_error(error: String) -> AppleAvailability {
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::{AppleAvailability, AppleDictateLevel};
+    use super::{AppleAvailability, AppleDictateLevel, AudioInputDevice};
     use std::ffi::{CStr, CString};
     use std::os::raw::{c_char, c_float, c_int, c_void};
     use tauri::{AppHandle, Emitter};
@@ -146,6 +169,12 @@ mod macos {
         fn pasteai_apple_dictation_start(
             level_cb: Option<unsafe extern "C" fn(c_float, *mut c_void)>,
             ctx: *mut c_void,
+            language: *const c_char,
+            device_uid: *const c_char,
+            out_error: *mut *mut c_char,
+        ) -> c_int;
+        fn pasteai_apple_list_input_devices(
+            out_json: *mut *mut c_char,
             out_error: *mut *mut c_char,
         ) -> c_int;
         fn pasteai_apple_dictation_stop(
@@ -188,11 +217,19 @@ mod macos {
         }
     }
 
-    pub fn dictation_start(app: AppHandle) -> Result<(), String> {
+    pub fn dictation_start(app: AppHandle, language: &str, device_uid: &str) -> Result<(), String> {
         *LEVEL_APP.lock().unwrap() = Some(app);
+        let language = CString::new(language).map_err(|error| error.to_string())?;
+        let device_uid = CString::new(device_uid).map_err(|error| error.to_string())?;
         let mut out_error: *mut c_char = std::ptr::null_mut();
         let status = unsafe {
-            pasteai_apple_dictation_start(Some(on_level), std::ptr::null_mut(), &mut out_error)
+            pasteai_apple_dictation_start(
+                Some(on_level),
+                std::ptr::null_mut(),
+                language.as_ptr(),
+                device_uid.as_ptr(),
+                &mut out_error,
+            )
         };
         let error = take_string(out_error);
         if status == 0 {
@@ -204,6 +241,23 @@ mod macos {
                 error
             })
         }
+    }
+
+    pub fn list_input_devices() -> Result<Vec<AudioInputDevice>, String> {
+        let mut out_json: *mut c_char = std::ptr::null_mut();
+        let mut out_error: *mut c_char = std::ptr::null_mut();
+        let status = unsafe { pasteai_apple_list_input_devices(&mut out_json, &mut out_error) };
+        let error = take_string(out_error);
+        let json = take_string(out_json);
+        if status != 0 {
+            return Err(if error.is_empty() {
+                "Could not list microphones".to_string()
+            } else {
+                error
+            });
+        }
+
+        serde_json::from_str(&json).map_err(|error| error.to_string())
     }
 
     pub fn dictation_stop() -> Result<String, String> {

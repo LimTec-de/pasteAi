@@ -54,7 +54,8 @@ pub fn run() {
             apple::apple_improve,
             apple::apple_dictation_start,
             apple::apple_dictation_stop,
-            apple::apple_dictation_cancel
+            apple::apple_dictation_cancel,
+            apple::apple_list_input_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

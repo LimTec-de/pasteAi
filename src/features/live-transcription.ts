@@ -15,26 +15,28 @@ registerProcessor('pcm-processor', PcmProcessor);
 
 const COMMIT_TIMEOUT_MS = 15_000;
 
-export const TRANSCRIPTION_SESSION_UPDATE = {
-    type: 'session.update',
-    session: {
-        type: 'transcription',
-        audio: {
-            input: {
-                format: {
-                    type: 'audio/pcm',
-                    rate: TARGET_SAMPLE_RATE
-                },
-                transcription: {
-                    model: 'gpt-transcribe',
-                    prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
-                    languages: ['de', 'en']
-                },
-                turn_detection: null
+export function transcriptionSessionUpdate(languages: string[]) {
+    return {
+        type: 'session.update',
+        session: {
+            type: 'transcription',
+            audio: {
+                input: {
+                    format: {
+                        type: 'audio/pcm',
+                        rate: TARGET_SAMPLE_RATE
+                    },
+                    transcription: {
+                        model: 'gpt-transcribe',
+                        prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
+                        languages
+                    },
+                    turn_detection: null
+                }
             }
         }
-    }
-} as const;
+    };
+}
 
 export interface TranscriptionHandlers {
     onDelta: (itemId: string, delta: string) => void;
@@ -67,14 +69,17 @@ export class LiveTranscriptionSession {
 
     constructor(private readonly handlers: TranscriptionHandlers) {}
 
-    async start(clientSecret: string): Promise<void> {
-        this.stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                channelCount: 1
-            }
-        });
+    async start(clientSecret: string, options: { languages: string[]; microphoneId?: string }): Promise<void> {
+        const audio: MediaTrackConstraints = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            channelCount: 1
+        };
+        if (options.microphoneId) {
+            audio.deviceId = { exact: options.microphoneId };
+        }
+
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio });
 
         this.socket = new WebSocket('wss://api.openai.com/v1/realtime?intent=transcription', [
             'realtime',
@@ -86,7 +91,7 @@ export class LiveTranscriptionSession {
                 return;
             }
 
-            this.socket?.send(JSON.stringify(TRANSCRIPTION_SESSION_UPDATE));
+            this.socket?.send(JSON.stringify(transcriptionSessionUpdate(options.languages)));
             this.ready = true;
         });
 

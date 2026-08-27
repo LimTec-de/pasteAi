@@ -1,5 +1,6 @@
 import type {
     DashboardSection,
+    DictateOutputMode,
     ManagedWindowId,
     PromptOption,
     StatusDisplayPayload
@@ -40,6 +41,9 @@ export interface DictateOpenPayload {
     engine: 'openai' | 'apple';
     clientSecret?: string;
     shortcut: string;
+    languages: string[];
+    microphoneId: string;
+    outputMode: DictateOutputMode;
 }
 
 export interface DictateCommitPayload {

@@ -1,4 +1,6 @@
 import AVFoundation
+import AudioToolbox
+import CoreAudio
 import Darwin
 import Foundation
 
@@ -75,6 +77,8 @@ public typealias PasteAILevelCallback = @convention(c) (Float, UnsafeMutableRawP
 public func pasteai_apple_dictation_start(
     levelCb: PasteAILevelCallback?,
     ctx: UnsafeMutableRawPointer?,
+    language: UnsafePointer<CChar>?,
+    deviceUID: UnsafePointer<CChar>?,
     outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
 ) -> Int32 {
     outError.pointee = nil
@@ -83,8 +87,34 @@ public func pasteai_apple_dictation_start(
         return 1
     }
 
+    let languageValue = language.map { String(cString: $0) } ?? ""
+    let deviceValue = deviceUID.map { String(cString: $0) } ?? ""
     do {
-        try runBlocking { try await DictationSession.shared.start(levelCb: levelCb, ctx: ctx) }
+        try runBlocking {
+            try await DictationSession.shared.start(
+                levelCb: levelCb,
+                ctx: ctx,
+                language: languageValue,
+                deviceUID: deviceValue
+            )
+        }
+        return 0
+    } catch {
+        outError.pointee = dup(error.localizedDescription)
+        return 1
+    }
+}
+
+@_cdecl("pasteai_apple_list_input_devices")
+public func pasteai_apple_list_input_devices(
+    outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
+    outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+) -> Int32 {
+    outJson.pointee = nil
+    outError.pointee = nil
+    do {
+        let data = try JSONEncoder().encode(listAudioInputDevices())
+        outJson.pointee = dup(String(data: data, encoding: .utf8) ?? "[]")
         return 0
     } catch {
         outError.pointee = dup(error.localizedDescription)
@@ -268,7 +298,7 @@ private func speechAvailabilityMac26() async -> Availability {
         return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
     }
 
-    guard let locale = await resolveSpeechLocale() else {
+    guard let locale = await resolveSpeechLocale(language: "auto") else {
         return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
     }
 
@@ -291,8 +321,12 @@ private func speechAvailabilityMac26() async -> Availability {
 }
 
 @available(macOS 26.0, *)
-private func resolveSpeechLocale() async -> Locale? {
+private func resolveSpeechLocale(language: String) async -> Locale? {
 #if canImport(Speech)
+    let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !trimmed.isEmpty && trimmed != "auto" {
+        return await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: trimmed))
+    }
     if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) {
         return locale
     }
@@ -323,7 +357,12 @@ private final class DictationSession: @unchecked Sendable {
     private var levelCtx: UnsafeMutableRawPointer?
     private var running = false
 
-    func start(levelCb: PasteAILevelCallback?, ctx: UnsafeMutableRawPointer?) async throws {
+    func start(
+        levelCb: PasteAILevelCallback?,
+        ctx: UnsafeMutableRawPointer?,
+        language: String,
+        deviceUID: String
+    ) async throws {
         lock.lock()
         let alreadyRunning = running
         lock.unlock()
@@ -335,7 +374,14 @@ private final class DictationSession: @unchecked Sendable {
         guard SpeechTranscriber.isAvailable else {
             throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
         }
-        guard let locale = await resolveSpeechLocale() else {
+        let specifiedLanguage = {
+            let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
+            return !trimmed.isEmpty && trimmed != "auto"
+        }()
+        guard let locale = await resolveSpeechLocale(language: language) else {
+            if specifiedLanguage {
+                throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition does not support this language."])
+            }
             throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
         }
 
@@ -356,6 +402,9 @@ private final class DictationSession: @unchecked Sendable {
 
         let engine = AVAudioEngine()
         let input = engine.inputNode
+        if !deviceUID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            try setEngineInputDevice(engine, uid: deviceUID)
+        }
         let hwFormat = input.outputFormat(forBus: 0)
         let converter = AVAudioConverter(from: hwFormat, to: audioFormat)
 
@@ -531,4 +580,146 @@ private final class DictationSession: @unchecked Sendable {
         lock.unlock()
         callback?(level, ctx)
     }
+}
+
+private struct AudioInputDeviceDTO: Encodable {
+    let id: String
+    let label: String
+}
+
+private func listAudioInputDevices() -> [AudioInputDeviceDTO] {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyDevices,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var size: UInt32 = 0
+    let sizeStatus = AudioObjectGetPropertyDataSize(
+        AudioObjectID(kAudioObjectSystemObject),
+        &address,
+        0,
+        nil,
+        &size
+    )
+    guard sizeStatus == noErr, size > 0 else {
+        return []
+    }
+
+    let count = Int(size) / MemoryLayout<AudioDeviceID>.size
+    var deviceIDs = [AudioDeviceID](repeating: 0, count: count)
+    let status = AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject),
+        &address,
+        0,
+        nil,
+        &size,
+        &deviceIDs
+    )
+    guard status == noErr else {
+        return []
+    }
+
+    return deviceIDs.compactMap { deviceID in
+        guard inputChannelCount(deviceID) > 0 else {
+            return nil
+        }
+        guard let uid = audioDeviceUID(deviceID), let name = audioDeviceName(deviceID) else {
+            return nil
+        }
+        return AudioInputDeviceDTO(id: uid, label: name)
+    }
+}
+
+private func setEngineInputDevice(_ engine: AVAudioEngine, uid: String) throws {
+    guard let deviceID = audioDeviceID(forUID: uid) else {
+        throw NSError(domain: "pasteAI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Selected microphone is not available."])
+    }
+    guard let audioUnit = engine.inputNode.audioUnit else {
+        throw NSError(domain: "pasteAI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Could not access the audio input unit."])
+    }
+
+    var selectedID = deviceID
+    let status = AudioUnitSetProperty(
+        audioUnit,
+        kAudioOutputUnitProperty_CurrentDevice,
+        kAudioUnitScope_Global,
+        0,
+        &selectedID,
+        UInt32(MemoryLayout<AudioDeviceID>.size)
+    )
+    if status != noErr {
+        throw NSError(domain: "pasteAI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Could not use the selected microphone."])
+    }
+}
+
+private func audioDeviceID(forUID uid: String) -> AudioDeviceID? {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioHardwarePropertyTranslateUIDToDevice,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var deviceID = AudioDeviceID()
+    var qualifier = uid as CFString
+    var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+    let status = AudioObjectGetPropertyData(
+        AudioObjectID(kAudioObjectSystemObject),
+        &address,
+        UInt32(MemoryLayout<CFString>.size),
+        &qualifier,
+        &size,
+        &deviceID
+    )
+    guard status == noErr, deviceID != kAudioObjectUnknown else {
+        return nil
+    }
+    return deviceID
+}
+
+private func audioDeviceUID(_ deviceID: AudioDeviceID) -> String? {
+    cfStringProperty(deviceID, kAudioDevicePropertyDeviceUID)
+}
+
+private func audioDeviceName(_ deviceID: AudioDeviceID) -> String? {
+    cfStringProperty(deviceID, kAudioObjectPropertyName)
+}
+
+private func cfStringProperty(_ deviceID: AudioDeviceID, _ selector: AudioObjectPropertySelector) -> String? {
+    var address = AudioObjectPropertyAddress(
+        mSelector: selector,
+        mScope: kAudioObjectPropertyScopeGlobal,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var value: Unmanaged<CFString>?
+    var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+    let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+    guard status == noErr, let value else {
+        return nil
+    }
+    return value.takeUnretainedValue() as String
+}
+
+private func inputChannelCount(_ deviceID: AudioDeviceID) -> Int {
+    var address = AudioObjectPropertyAddress(
+        mSelector: kAudioDevicePropertyStreamConfiguration,
+        mScope: kAudioObjectPropertyScopeInput,
+        mElement: kAudioObjectPropertyElementMain
+    )
+    var size: UInt32 = 0
+    let sizeStatus = AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &size)
+    guard sizeStatus == noErr, size > 0 else {
+        return 0
+    }
+
+    let raw = UnsafeMutableRawPointer.allocate(
+        byteCount: Int(size),
+        alignment: MemoryLayout<AudioBufferList>.alignment
+    )
+    defer { raw.deallocate() }
+    let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, raw)
+    guard status == noErr else {
+        return 0
+    }
+
+    let buffers = UnsafeMutableAudioBufferListPointer(raw.assumingMemoryBound(to: AudioBufferList.self))
+    return buffers.reduce(0) { $0 + Int($1.mNumberChannels) }
 }

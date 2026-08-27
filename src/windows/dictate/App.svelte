@@ -11,6 +11,7 @@
     let session: LiveTranscriptionSession | null = null;
     let unlistenLevel: (() => void) | undefined;
     let engine: DictateOpenPayload['engine'] = 'openai';
+    let outputMode: DictateOpenPayload['outputMode'] = 'insert';
     let committedByItem = new Map<string, string>();
     let committedOrder: string[] = [];
     let partialByItem = new Map<string, string>();
@@ -30,8 +31,8 @@
     $: displayText = [committedText, partialText].filter((part) => part.length > 0).join(' ');
     $: holdLine = shortcutLabel ? `Hold ${shortcutLabel} and speak.` : 'Hold the shortcut and speak.';
     $: actionLine = latched
-        ? 'Click Done to insert and copy to clipboard.'
-        : 'Release to insert and copy to clipboard.';
+        ? (outputMode === 'clipboard' ? 'Click Done to copy to clipboard.' : 'Click Done to insert and copy to clipboard.')
+        : (outputMode === 'clipboard' ? 'Release to copy to clipboard.' : 'Release to insert and copy to clipboard.');
 
     function resetTranscript(): void {
         committedByItem = new Map();
@@ -48,6 +49,7 @@
         stopSession();
         resetTranscript();
         engine = payload.engine;
+        outputMode = payload.outputMode;
         shortcutLabel = formatAcceleratorForDisplay(payload.shortcut);
         statusMessage = 'Recording started';
 
@@ -96,7 +98,10 @@
         session = nextSession;
 
         try {
-            await nextSession.start(clientSecret);
+            await nextSession.start(clientSecret, {
+                languages: payload.languages,
+                microphoneId: payload.microphoneId || undefined
+            });
             if (session === nextSession) {
                 statusMessage = 'Recording started';
             }
@@ -233,7 +238,7 @@
 
 <WindowShell
     title="Dictate"
-    eyebrow="Hold to insert"
+    eyebrow={outputMode === 'clipboard' ? 'Hold to copy' : 'Hold to insert'}
     variant="focus"
     onClose={cancel}
 >

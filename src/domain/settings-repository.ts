@@ -13,7 +13,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showStart: true,
     improveHtml: true,
     dictateShortcut: CONFIG.DEFAULT_DICTATE_SHORTCUT,
-    dictationProvider: 'openai'
+    dictationProvider: 'openai',
+    dictateLanguage: 'auto',
+    dictateMicrophoneId: '',
+    dictateOutputMode: 'insert'
 };
 
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
@@ -27,7 +30,10 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     showStart: 'showStart',
     improveHtml: 'improveHtml',
     dictateShortcut: 'dictateShortcut',
-    dictationProvider: 'dictationProvider'
+    dictationProvider: 'dictationProvider',
+    dictateLanguage: 'dictateLanguage',
+    dictateMicrophoneId: 'dictateMicrophoneId',
+    dictateOutputMode: 'dictateOutputMode'
 };
 
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
@@ -149,6 +155,14 @@ export class SettingsRepository {
                 return (value === 'openai' || value === 'apple'
                     ? value
                     : DEFAULT_SETTINGS.dictationProvider) as AppSettings[K];
+            case 'dictateLanguage':
+                return (value === 'auto' || value === 'de' || value === 'en'
+                    ? value
+                    : DEFAULT_SETTINGS.dictateLanguage) as AppSettings[K];
+            case 'dictateOutputMode':
+                return (value === 'insert' || value === 'clipboard'
+                    ? value
+                    : DEFAULT_SETTINGS.dictateOutputMode) as AppSettings[K];
             case 'openaiApiKey':
             case 'ollamaUrl':
             case 'ollamaModel':
@@ -158,6 +172,8 @@ export class SettingsRepository {
                 return (typeof value === 'string' && value.trim().length > 0
                     ? value
                     : DEFAULT_SETTINGS[key]) as AppSettings[K];
+            case 'dictateMicrophoneId':
+                return (typeof value === 'string' ? value : DEFAULT_SETTINGS.dictateMicrophoneId) as AppSettings[K];
             case 'defaultPromptId':
                 if (typeof value === 'number' && Number.isFinite(value)) {
                     return value as AppSettings[K];

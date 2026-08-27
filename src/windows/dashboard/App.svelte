@@ -11,8 +11,8 @@
     import { PromptRepository } from '../../domain/prompt-repository';
     import { DEFAULT_SETTINGS, SettingsRepository } from '../../domain/settings-repository';
     import { ProviderGateway } from '../../domain/provider-gateway';
-    import type { AppSettings, DashboardSection, DictationProviderId, PromptOption, PromptOutputMode, ProviderId } from '../../domain/types';
-    import { getAppleSpeechAvailability, getAppleTextAvailability, type AppleAvailability, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
+    import type { AppSettings, DashboardSection, DictateOutputMode, DictationProviderId, PromptOption, PromptOutputMode, ProviderId } from '../../domain/types';
+    import { getAppleSpeechAvailability, getAppleTextAvailability, listAppleInputDevices, type AppleAvailability, type AudioInputDevice, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -53,10 +53,13 @@
     let recordingShortcut = false;
     let shortcutMessage = '';
     let shortcutIsError = false;
+    let microphoneDevices: AudioInputDevice[] = [];
+    let microphoneMessage = '';
 
     let version = 'Loading version...';
     let welcomeSectionElement: HTMLElement | null = null;
     let providersSectionElement: HTMLElement | null = null;
+    let dictationSectionElement: HTMLElement | null = null;
     let promptsSectionElement: HTMLElement | null = null;
     let shellSectionElement: HTMLElement | null = null;
     let aboutSectionElement: HTMLElement | null = null;
@@ -98,12 +101,19 @@
         && editText.trim().length > 0
         && (editTitle !== selectedPrompt.title || editText !== selectedPrompt.prompt || editIdentifier !== selectedPrompt.identifier);
 
+    $: selectedMicrophoneId = microphoneDevices.some((device) => device.id === settings.dictateMicrophoneId)
+        ? settings.dictateMicrophoneId
+        : '';
+
     function setActiveSection(section: DashboardSection): void {
         activeSection = section;
         scrollActiveSectionToTop(section);
         if (section === 'providers') {
             void refreshProviderState();
             void refreshAppleAvailability();
+        }
+        if (section === 'dictation') {
+            void refreshMicrophones();
         }
     }
 
@@ -118,6 +128,8 @@
                 return welcomeSectionElement;
             case 'providers':
                 return providersSectionElement;
+            case 'dictation':
+                return dictationSectionElement;
             case 'prompts':
                 return promptsSectionElement;
             case 'shell':
@@ -313,6 +325,42 @@
         void saveDictateShortcut(accelerator);
     }
 
+    async function handleDictateLanguageChange(): Promise<void> {
+        await updateSettings({ dictateLanguage: settings.dictateLanguage });
+    }
+
+    async function handleDictateMicrophoneChange(event: Event): Promise<void> {
+        const value = (event.currentTarget as HTMLSelectElement).value;
+        await updateSettings({ dictateMicrophoneId: value });
+    }
+
+    async function handleDictateOutputModeChange(mode: DictateOutputMode): Promise<void> {
+        await updateSettings({ dictateOutputMode: mode });
+    }
+
+    async function refreshMicrophones(): Promise<void> {
+        microphoneMessage = '';
+        try {
+            if (settings.dictationProvider === 'apple') {
+                microphoneDevices = await listAppleInputDevices();
+                return;
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach((track) => track.stop());
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            microphoneDevices = devices
+                .filter((device) => device.kind === 'audioinput' && device.deviceId.length > 0)
+                .map((device) => ({
+                    id: device.deviceId,
+                    label: device.label || 'Microphone'
+                }));
+        } catch (error) {
+            microphoneDevices = [];
+            microphoneMessage = error instanceof Error ? error.message : 'Could not list microphones.';
+        }
+    }
+
     async function handleLogin(): Promise<void> {
         if (!settings.email.trim()) {
             loginMessage = 'Please enter an email address';
@@ -475,12 +523,19 @@
         })();
 
         window.addEventListener('keydown', handleShortcutKeydown, true);
+        const handleDeviceChange = () => {
+            if (activeSection === 'dictation') {
+                void refreshMicrophones();
+            }
+        };
+        navigator.mediaDevices?.addEventListener('devicechange', handleDeviceChange);
 
         return () => {
             unlistenOpen?.();
             unlistenCloseRequested?.();
             unlistenFocus?.();
             window.removeEventListener('keydown', handleShortcutKeydown, true);
+            navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
         };
     });
 </script>
@@ -498,6 +553,9 @@
                 </button>
                 <button class:active={activeSection === 'providers'} type="button" on:click={() => setActiveSection('providers')}>
                     AI Provider
+                </button>
+                <button class:active={activeSection === 'dictation'} type="button" on:click={() => setActiveSection('dictation')}>
+                    Dictation
                 </button>
                 <button class:active={activeSection === 'prompts'} type="button" on:click={() => setActiveSection('prompts')}>
                     Prompt Library
@@ -573,7 +631,7 @@
                         <div class="welcome-tips fade-up">
                             <article class="callout-card start-callout">
                                 <h3>Dictate at the cursor</h3>
-                                <p>Hold the dictate shortcut (default {settings.dictateShortcut}) and speak. Release to insert the transcript where you were typing and copy it to the clipboard. A short tap keeps the window open — click Done when you are finished. Set the rewrite provider and dictation engine in Settings. On-device Mac options need macOS 26.</p>
+                                <p>Hold the dictate shortcut (default {settings.dictateShortcut}) and speak. Release to insert the transcript where you were typing and copy it to the clipboard. A short tap keeps the window open — click Done when you are finished. Change the shortcut, language, microphone, and insert behavior under Dictation. Set the rewrite provider and dictation engine under AI Provider. On-device Mac options need macOS 26.</p>
                             </article>
                             <article class="callout-card start-callout">
                                 <h3>Keep it private</h3>
@@ -681,28 +739,6 @@
                             <input id="apiKey" type="password" bind:value={settings.openaiApiKey} placeholder="sk-..." on:change={() => void handleOpenAIKeyChange()}>
                         </section>
 
-                        <section class="provider-panel panel-card is-visible">
-                            <div class="field-label">
-                                <label for="dictateShortcut">Dictate shortcut</label>
-                                <span>Hold to dictate, release to insert at the cursor and copy. A short tap opens the window; click Done to insert and copy. Needs Control/Command or Alt plus a key.</span>
-                            </div>
-                            <div class="field-row">
-                                <input
-                                    id="dictateShortcut"
-                                    type="text"
-                                    readonly
-                                    value={recordingShortcut ? 'Press a shortcut…' : settings.dictateShortcut}
-                                    on:click={startShortcutRecording}
-                                >
-                                <button class="app-button app-button--secondary" type="button" on:click={startShortcutRecording}>
-                                    {recordingShortcut ? 'Listening…' : 'Change'}
-                                </button>
-                            </div>
-                            {#if shortcutMessage}
-                                <div class={`status is-visible ${shortcutIsError ? 'status--error' : 'status--success'}`}>{shortcutMessage}</div>
-                            {/if}
-                        </section>
-
                         {#if settings.llmType === 'pasteai'}
                             <section class="provider-panel panel-card is-visible">
                                 <div class="field-label">
@@ -763,6 +799,79 @@
                                 </section>
                             </section>
                         {/if}
+                    </div>
+                </section>
+
+                <section bind:this={dictationSectionElement} class:active={activeSection === 'dictation'} class="dashboard-section">
+                    <div class="dashboard-section__panel">
+                        <div class="section-heading">
+                            <span class="section-kicker">Dictation</span>
+                            <h2>Hold a shortcut, speak, insert the transcript.</h2>
+                            <p>Choose the shortcut and how speech is captured. The dictation engine itself is under AI Provider.</p>
+                        </div>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="dictateShortcut">Dictate shortcut</label>
+                                <span>Hold to dictate, release to insert at the cursor and copy. A short tap opens the window; click Done to insert and copy. Needs Control/Command or Alt plus a key.</span>
+                            </div>
+                            <div class="field-row">
+                                <input
+                                    id="dictateShortcut"
+                                    type="text"
+                                    readonly
+                                    value={recordingShortcut ? 'Press a shortcut…' : settings.dictateShortcut}
+                                    on:click={startShortcutRecording}
+                                >
+                                <button class="app-button app-button--secondary" type="button" on:click={startShortcutRecording}>
+                                    {recordingShortcut ? 'Listening…' : 'Change'}
+                                </button>
+                            </div>
+                            {#if shortcutMessage}
+                                <div class={`status is-visible ${shortcutIsError ? 'status--error' : 'status--success'}`}>{shortcutMessage}</div>
+                            {/if}
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="dictateLanguage">Language</label>
+                                <span>Auto keeps German and English hints for OpenAI, and the Mac system locale for on-device dictation.</span>
+                            </div>
+                            <select id="dictateLanguage" bind:value={settings.dictateLanguage} on:change={() => void handleDictateLanguageChange()}>
+                                <option value="auto">Auto</option>
+                                <option value="de">German</option>
+                                <option value="en">English</option>
+                            </select>
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="dictateMicrophone">Microphone</label>
+                                <span>Used by the currently selected dictation engine. Leave on system default unless you need a specific input.</span>
+                            </div>
+                            <select id="dictateMicrophone" value={selectedMicrophoneId} on:change={(event) => void handleDictateMicrophoneChange(event)}>
+                                <option value="">System default</option>
+                                {#each microphoneDevices as device}
+                                    <option value={device.id}>{device.label}</option>
+                                {/each}
+                            </select>
+                            {#if microphoneMessage}
+                                <div class="status is-visible status--error">{microphoneMessage}</div>
+                            {/if}
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label>When finished</label>
+                                <span>Insert pastes into the app you were using. Copy only leaves the transcript on the clipboard.</span>
+                            </div>
+                            <div class="output-mode">
+                                <div class="output-mode__options">
+                                    <button class:is-active={settings.dictateOutputMode === 'insert'} type="button" on:click={() => void handleDictateOutputModeChange('insert')}>Insert and copy</button>
+                                    <button class:is-active={settings.dictateOutputMode === 'clipboard'} type="button" on:click={() => void handleDictateOutputModeChange('clipboard')}>Copy only</button>
+                                </div>
+                            </div>
+                        </section>
                     </div>
                 </section>
 
