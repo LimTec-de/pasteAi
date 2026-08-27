@@ -20,11 +20,13 @@ By using PasteAI, you agree to these terms. The application processes text throu
 ### Data Collection
 PasteAI collects and processes:
 - Clipboard content (only when explicitly triggered by user)
+- Microphone audio during dictation (only while the dictation window is open)
 - Email address (for PasteAI account users)
 - API keys (stored locally)
 
 ### Data Processing
 - Text is processed through OpenAI's API or local Ollama instance
+- Dictation audio is sent to OpenAI's Realtime transcription API when the user starts speech-to-clipboard
 - No permanent storage of processed text
 - API keys are stored locally
 - Clipboard history is stored locally

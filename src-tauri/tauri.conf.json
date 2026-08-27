@@ -53,7 +53,8 @@
     ],
     "macOS": {
       "exceptionDomain": "localhost",
-      "frameworks": []
+      "frameworks": [],
+      "entitlements": "./Entitlements.plist"
     },
     "windows": {
       "signCommand": "trusted-signing-cli -e https://neu.codesigning.azure.net/ -a limtec -c CodeSigningCertificate -d pasteAI %1"

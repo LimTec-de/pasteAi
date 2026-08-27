@@ -1,0 +1,73 @@
+.dictate-shell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+    height: calc(100vh - 61px);
+    padding: 18px 22px 20px;
+    box-sizing: border-box;
+}
+
+.dictate-meter {
+    position: relative;
+    display: grid;
+    place-items: center;
+    height: 72px;
+}
+
+.dictate-meter__pulse,
+.dictate-meter__core {
+    grid-area: 1 / 1;
+    border-radius: 999px;
+}
+
+.dictate-meter__pulse {
+    width: 52px;
+    height: 52px;
+    background: var(--color-accent-soft);
+    opacity: 0.7;
+    transition: transform 80ms linear;
+}
+
+.dictate-meter.is-receiving .dictate-meter__pulse {
+    background: rgba(249, 115, 22, 0.28);
+}
+
+.dictate-meter__core {
+    width: 18px;
+    height: 18px;
+    background: var(--color-accent);
+}
+
+.dictate-meter.is-receiving .dictate-meter__core {
+    background: var(--color-accent-strong);
+}
+
+.dictate-status {
+    margin: 0;
+    text-align: center;
+    color: var(--color-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.dictate-hint {
+    margin: 0;
+    text-align: center;
+    color: var(--color-text);
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
+.dictate-hint + .dictate-hint {
+    margin-top: -0.45rem;
+}
+
+.dictate-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: auto;
+    gap: 0.8rem;
+}

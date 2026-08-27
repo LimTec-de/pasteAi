@@ -5,6 +5,7 @@
     import clipboard from 'tauri-plugin-clipboard-api';
     import { onMount } from 'svelte';
     import { SHELL_INSTALL_COMMANDS } from '../../config';
+    import { isForbiddenDictateShortcut, keyboardEventToAccelerator } from '../../platform/shortcut';
     import { APP_EVENTS, type DashboardOpenPayload, type WindowReadyPayload } from '../../app/events';
     import { AppStore } from '../../domain/store';
     import { PromptRepository } from '../../domain/prompt-repository';
@@ -46,6 +47,9 @@
 
     let ollamaAvailable = true;
     let ollamaModels: string[] = [];
+    let recordingShortcut = false;
+    let shortcutMessage = '';
+    let shortcutIsError = false;
 
     let version = 'Loading version...';
     let welcomeSectionElement: HTMLElement | null = null;
@@ -241,6 +245,46 @@
         await updateSettings({ improveHtml: settings.improveHtml });
     }
 
+    async function saveDictateShortcut(accelerator: string): Promise<void> {
+        if (isForbiddenDictateShortcut(accelerator)) {
+            shortcutMessage = 'That shortcut would steal Copy. Pick another combination.';
+            shortcutIsError = true;
+            return;
+        }
+
+        shortcutMessage = '';
+        shortcutIsError = false;
+        await updateSettings({ dictateShortcut: accelerator });
+    }
+
+    function startShortcutRecording(): void {
+        recordingShortcut = true;
+        shortcutMessage = '';
+        shortcutIsError = false;
+    }
+
+    function handleShortcutKeydown(event: KeyboardEvent): void {
+        if (!recordingShortcut) {
+            return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+
+        if (event.key === 'Escape') {
+            recordingShortcut = false;
+            return;
+        }
+
+        const accelerator = keyboardEventToAccelerator(event);
+        if (!accelerator) {
+            return;
+        }
+
+        recordingShortcut = false;
+        void saveDictateShortcut(accelerator);
+    }
+
     async function handleLogin(): Promise<void> {
         if (!settings.email.trim()) {
             loginMessage = 'Please enter an email address';
@@ -396,9 +440,12 @@
             }
         })();
 
+        window.addEventListener('keydown', handleShortcutKeydown, true);
+
         return () => {
             unlistenOpen?.();
             unlistenCloseRequested?.();
+            window.removeEventListener('keydown', handleShortcutKeydown, true);
         };
     });
 </script>
@@ -490,6 +537,10 @@
 
                         <div class="welcome-tips fade-up">
                             <article class="callout-card start-callout">
+                                <h3>Dictate at the cursor</h3>
+                                <p>Hold the dictate shortcut (default {settings.dictateShortcut}) and speak. Release to insert the transcript where you were typing and copy it to the clipboard. A short tap keeps the window open — click Done when you are finished. Set the shortcut in Settings. Needs an OpenAI API key, even if rewrites use PasteAI or Ollama.</p>
+                            </article>
+                            <article class="callout-card start-callout">
                                 <h3>Keep it private</h3>
                                 <p>Switch to Ollama to keep text improvements on your own machine.</p>
                             </article>
@@ -533,6 +584,36 @@
                             </button>
                         </div>
 
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="apiKey">OpenAI API key</label>
+                                <span>Required for dictation. Also used when OpenAI is the rewrite provider.</span>
+                            </div>
+                            <input id="apiKey" type="password" bind:value={settings.openaiApiKey} placeholder="sk-..." on:change={() => void handleOpenAIKeyChange()}>
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="dictateShortcut">Dictate shortcut</label>
+                                <span>Hold to dictate, release to insert at the cursor and copy. A short tap opens the window; click Done to insert and copy. Needs Control/Command or Alt plus a key.</span>
+                            </div>
+                            <div class="field-row">
+                                <input
+                                    id="dictateShortcut"
+                                    type="text"
+                                    readonly
+                                    value={recordingShortcut ? 'Press a shortcut…' : settings.dictateShortcut}
+                                    on:click={startShortcutRecording}
+                                >
+                                <button class="app-button app-button--secondary" type="button" on:click={startShortcutRecording}>
+                                    {recordingShortcut ? 'Listening…' : 'Change'}
+                                </button>
+                            </div>
+                            {#if shortcutMessage}
+                                <div class={`status is-visible ${shortcutIsError ? 'status--error' : 'status--success'}`}>{shortcutMessage}</div>
+                            {/if}
+                        </section>
+
                         {#if settings.llmType === 'pasteai'}
                             <section class="provider-panel panel-card is-visible">
                                 <div class="field-label">
@@ -558,16 +639,6 @@
                                 {#if quotaMessage}
                                     <div class={`status is-visible ${quotaIsError ? 'status--error' : 'status--success'}`}>{quotaMessage}</div>
                                 {/if}
-                            </section>
-                        {/if}
-
-                        {#if settings.llmType === 'openai'}
-                            <section class="provider-panel panel-card is-visible">
-                                <div class="field-label">
-                                    <label for="apiKey">OpenAI API key</label>
-                                    <span>Paste your API key here to send clipboard rewrites through OpenAI.</span>
-                                </div>
-                                <input id="apiKey" type="password" bind:value={settings.openaiApiKey} placeholder="sk-..." on:change={() => void handleOpenAIKeyChange()}>
                             </section>
                         {/if}
 

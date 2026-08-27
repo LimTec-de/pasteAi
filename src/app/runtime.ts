@@ -10,6 +10,7 @@ import { UpdateService } from '../platform/updates';
 import { AppWindows } from '../platform/windows';
 import { TrayController } from '../platform/tray';
 import { ClipboardImprover } from '../features/clipboard-improver';
+import { DictationController } from '../features/dictation';
 
 export class AppRuntime {
     private readonly store = new AppStore();
@@ -21,6 +22,7 @@ export class AppRuntime {
     private readonly updates = new UpdateService((title, body) => this.notifier.notify(title, body));
     private readonly tray = new TrayController(this.prompts, this.windows, this.updates);
     private readonly clipboard = new ClipboardImprover(this.prompts, this.providers, this.windows, this.settings);
+    private readonly dictation = new DictationController(this.settings, this.providers, this.windows, this.clipboard);
 
     async start(): Promise<void> {
         await this.settings.initialize();
@@ -32,6 +34,7 @@ export class AppRuntime {
         await this.tray.initialize();
         await this.providers.warmup();
         await this.clipboard.start();
+        await this.dictation.start();
 
         const settings = await this.settings.getAll();
         void this.windows.prewarmStatusWindow().catch((error) => {
@@ -39,6 +42,9 @@ export class AppRuntime {
         });
         void this.windows.prewarmAnswerWindow().catch((error) => {
             console.error('Failed to prewarm answer window:', error);
+        });
+        void this.windows.prewarmDictateWindow().catch((error) => {
+            console.error('Failed to prewarm dictate window:', error);
         });
 
         if (!await this.prompts.getDefaultPrompt()) {
@@ -60,6 +66,7 @@ export class AppRuntime {
         await listen(APP_EVENTS.SETTINGS_CHANGED, async () => {
             await this.settings.reload();
             await this.providers.warmup();
+            await this.dictation.reregister();
         });
 
         await listen(APP_EVENTS.PROMPTS_CHANGED, async () => {

@@ -1,8 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { UserAttentionType, Window } from '@tauri-apps/api/window';
+import { LogicalSize, UserAttentionType, Window } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { APP_EVENTS, type AnswerDisplayPayload, type DashboardOpenPayload, type WindowReadyPayload } from '../app/events';
+import { APP_EVENTS, type AnswerDisplayPayload, type DashboardOpenPayload, type DictateOpenPayload, type WindowReadyPayload } from '../app/events';
 import { WINDOW_CONFIG } from '../config';
 import { centerWindowOnCursorMonitor } from './window-placement';
 import type {
@@ -24,6 +24,7 @@ interface ManagedWindowDefinition {
     decorations: boolean;
     skipTaskbar: boolean;
     visible: boolean;
+    focus?: boolean;
 }
 
 interface ManagedWindowState {
@@ -86,10 +87,24 @@ const MANAGED_WINDOWS: Record<ManagedWindowId, ManagedWindowDefinition> = {
         decorations: false,
         skipTaskbar: false,
         visible: false
+    },
+    dictate: {
+        label: 'dictate',
+        url: '/dictate.html',
+        title: WINDOW_CONFIG.dictate.title,
+        width: WINDOW_CONFIG.dictate.width,
+        height: WINDOW_CONFIG.dictate.height,
+        resizable: false,
+        alwaysOnTop: true,
+        transparent: false,
+        decorations: false,
+        skipTaskbar: true,
+        visible: false,
+        focus: false
     }
 };
 
-const CURSOR_CENTERED_WINDOWS = new Set<ManagedWindowId>(['status', 'answer', 'prompt']);
+const CURSOR_CENTERED_WINDOWS = new Set<ManagedWindowId>(['status', 'answer', 'prompt', 'dictate']);
 
 export class AppWindows {
     private readonly registry = new Map<ManagedWindowId, ManagedWindowState>();
@@ -131,6 +146,10 @@ export class AppWindows {
         return this.ensureWindow('answer');
     }
 
+    async prewarmDictateWindow(): Promise<WebviewWindow> {
+        return this.ensureWindow('dictate');
+    }
+
     async choosePrompt(): Promise<PromptOption | null> {
         const promptWindow = await this.ensureWindow('prompt');
         const mainWindow = Window.getCurrent();
@@ -166,6 +185,44 @@ export class AppWindows {
         await this.revealWindow(promptWindow, { focus: true, promoteToFront: true });
 
         return selectionPromise;
+    }
+
+    async showDictate(clientSecret: string, shortcut: string): Promise<void> {
+        const dictateWindow = await this.ensureWindow('dictate');
+        await this.tryWindowCall('resize dictate window', () => dictateWindow.setSize(
+            new LogicalSize(WINDOW_CONFIG.dictate.width, WINDOW_CONFIG.dictate.height)
+        ));
+        const payload: DictateOpenPayload = { clientSecret, shortcut };
+        await dictateWindow.emit(APP_EVENTS.DICTATE_OPEN, payload);
+        await this.revealWindow(dictateWindow, { focus: false, promoteToFront: true });
+    }
+
+    async latchDictate(): Promise<void> {
+        const dictateWindow = this.registry.get('dictate')?.window;
+        if (!dictateWindow) {
+            return;
+        }
+
+        await dictateWindow.emit(APP_EVENTS.DICTATE_LATCH);
+    }
+
+    async hideDictate(): Promise<void> {
+        const dictateWindow = this.registry.get('dictate')?.window;
+        if (!dictateWindow) {
+            return;
+        }
+
+        await dictateWindow.emit(APP_EVENTS.DICTATE_HIDE);
+        await this.tryWindowCall('hide dictate window', () => dictateWindow.hide());
+    }
+
+    async requestDictateFinish(): Promise<void> {
+        const dictateWindow = this.registry.get('dictate')?.window;
+        if (!dictateWindow) {
+            return;
+        }
+
+        await dictateWindow.emit(APP_EVENTS.DICTATE_FINISH);
     }
 
     async showStatus(payload: StatusDisplayPayload): Promise<void> {
@@ -253,7 +310,8 @@ export class AppWindows {
             transparent: definition.transparent,
             decorations: definition.decorations,
             skipTaskbar: definition.skipTaskbar,
-            visible: definition.visible
+            visible: definition.visible,
+            focus: definition.focus
         });
 
         const state: ManagedWindowState = {

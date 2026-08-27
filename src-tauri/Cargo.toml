@@ -36,9 +36,23 @@ tauri-plugin-http = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
+tauri-plugin-global-shortcut = "2.3.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSWorkspace", "NSRunningApplication"] }
+core-foundation = "0.10"
+objc2-core-graphics = { version = "0.3", features = ["CGEvent", "CGEventTypes", "CGRemoteOperation"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging"
+] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+enigo = "0.6.1"
 
 [lints.rust]
 unused_variables = "allow"

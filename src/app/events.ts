@@ -15,7 +15,13 @@ export const APP_EVENTS = {
     STATUS_HIDE: 'status:hide',
     ANSWER_SHOW: 'answer:show',
     SETTINGS_CHANGED: 'settings:changed',
-    PROMPTS_CHANGED: 'prompts:changed'
+    PROMPTS_CHANGED: 'prompts:changed',
+    DICTATE_OPEN: 'dictate:open',
+    DICTATE_HIDE: 'dictate:hide',
+    DICTATE_LATCH: 'dictate:latch',
+    DICTATE_FINISH: 'dictate:finish',
+    DICTATE_COMMIT: 'dictate:commit',
+    DICTATE_CANCEL: 'dictate:cancel'
 } as const;
 
 export interface WindowReadyPayload {
@@ -30,6 +36,16 @@ export interface AnswerDisplayPayload {
     text: string;
 }
 
+export interface DictateOpenPayload {
+    clientSecret: string;
+    shortcut: string;
+}
+
+export interface DictateCommitPayload {
+    text: string;
+    error?: string;
+}
+
 export interface AppEventPayloads {
     [APP_EVENTS.WINDOW_READY]: WindowReadyPayload;
     [APP_EVENTS.DASHBOARD_OPEN]: DashboardOpenPayload;
@@ -41,4 +57,10 @@ export interface AppEventPayloads {
     [APP_EVENTS.ANSWER_SHOW]: AnswerDisplayPayload;
     [APP_EVENTS.SETTINGS_CHANGED]: undefined;
     [APP_EVENTS.PROMPTS_CHANGED]: undefined;
+    [APP_EVENTS.DICTATE_OPEN]: DictateOpenPayload;
+    [APP_EVENTS.DICTATE_HIDE]: undefined;
+    [APP_EVENTS.DICTATE_LATCH]: undefined;
+    [APP_EVENTS.DICTATE_FINISH]: undefined;
+    [APP_EVENTS.DICTATE_COMMIT]: DictateCommitPayload;
+    [APP_EVENTS.DICTATE_CANCEL]: undefined;
 }

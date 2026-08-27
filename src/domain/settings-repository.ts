@@ -1,4 +1,5 @@
 import { AppStore } from './store';
+import { CONFIG } from '../config';
 import type { AppSettings } from './types';
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -10,7 +11,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     appId: '',
     email: '',
     showStart: true,
-    improveHtml: true
+    improveHtml: true,
+    dictateShortcut: CONFIG.DEFAULT_DICTATE_SHORTCUT
 };
 
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
@@ -22,7 +24,8 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     appId: 'appId',
     email: 'email',
     showStart: 'showStart',
-    improveHtml: 'improveHtml'
+    improveHtml: 'improveHtml',
+    dictateShortcut: 'dictateShortcut'
 };
 
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
@@ -145,7 +148,10 @@ export class SettingsRepository {
             case 'ollamaModel':
             case 'appId':
             case 'email':
-                return (typeof value === 'string' ? value : DEFAULT_SETTINGS[key]) as AppSettings[K];
+            case 'dictateShortcut':
+                return (typeof value === 'string' && value.trim().length > 0
+                    ? value
+                    : DEFAULT_SETTINGS[key]) as AppSettings[K];
             case 'defaultPromptId':
                 if (typeof value === 'number' && Number.isFinite(value)) {
                     return value as AppSettings[K];

@@ -6,6 +6,7 @@ export interface AppConfig {
     COPY_THRESHOLD: number;
     TRIGGER_PREFIX: string;
     APP_NAME: string;
+    DEFAULT_DICTATE_SHORTCUT: string;
 }
 
 export interface WindowConfig {
@@ -29,6 +30,11 @@ export interface WindowConfig {
         height: number;
         title: string;
     };
+    dictate: {
+        width: number;
+        height: number;
+        title: string;
+    };
 }
 
 export const CONFIG: AppConfig = {
@@ -38,7 +44,8 @@ export const CONFIG: AppConfig = {
     COPY_DETECTION_INTERVAL_MAX: 3000,
     COPY_THRESHOLD: 3,
     TRIGGER_PREFIX: 'pasteai:',
-    APP_NAME: 'pasteAI'
+    APP_NAME: 'pasteAI',
+    DEFAULT_DICTATE_SHORTCUT: 'CommandOrControl+Shift+Space'
 };
 
 export const SHELL_INSTALL_COMMANDS: Record<'bash' | 'zsh', string> = {
@@ -66,5 +73,10 @@ export const WINDOW_CONFIG: WindowConfig = {
         width: 620,
         height: 480,
         title: 'pasteAI Result'
+    },
+    dictate: {
+        width: 380,
+        height: 312,
+        title: 'Dictate'
     }
 };

@@ -165,6 +165,52 @@ export class ProviderGateway {
         return completion.choices[0].message.content || text;
     }
 
+    async createTranscriptionClientSecret(): Promise<string> {
+        const settings = await this.settingsRepository.getAll();
+        const apiKey = settings.openaiApiKey.trim();
+        if (!apiKey) {
+            throw new Error('OpenAI API key missing');
+        }
+
+        const response = await tauriFetch('https://api.openai.com/v1/realtime/client_secrets', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                session: {
+                    type: 'transcription',
+                    audio: {
+                        input: {
+                            format: {
+                                type: 'audio/pcm',
+                                rate: 24000
+                            },
+                            transcription: {
+                                model: 'gpt-transcribe',
+                                prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
+                                languages: ['de', 'en']
+                            },
+                            turn_detection: null
+                        }
+                    }
+                }
+            })
+        });
+
+        const data = await response.json() as {
+            value?: string;
+            error?: { message?: string };
+        };
+
+        if (!response.ok || !data.value) {
+            throw new Error(data.error?.message || 'Could not start transcription session');
+        }
+
+        return data.value;
+    }
+
     private async improveWithOllama(text: string, systemPrompt: string, settings: AppSettings): Promise<string> {
         if (!settings.ollamaUrl.trim()) {
             throw new Error('Ollama URL missing');

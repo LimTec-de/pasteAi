@@ -1,0 +1,9 @@
+[[permission]]
+identifier = "allow-frontmost-app"
+description = "Remember the frontmost app and paste into it"
+commands.allow = [
+    "remember_frontmost_app",
+    "restore_frontmost_app",
+    "paste_into_frontmost",
+    "open_accessibility_settings"
+]

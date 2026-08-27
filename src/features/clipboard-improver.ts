@@ -15,7 +15,7 @@ interface ImproveInput {
     html: string | null;
 }
 
-type ClipboardRunState = 'idle' | 'awaitingPrompt' | 'improving' | 'applyingResult' | 'cooldown';
+type ClipboardRunState = 'idle' | 'awaitingPrompt' | 'improving' | 'applyingResult' | 'cooldown' | 'dictating';
 
 interface ClipboardState {
     clipboardContent: string;
@@ -51,6 +51,26 @@ export class ClipboardImprover {
         });
 
         await startListening();
+    }
+
+    isBusy(): boolean {
+        return this.state.runState !== 'idle' && this.state.runState !== 'cooldown';
+    }
+
+    beginDictation(): void {
+        this.state.runState = 'dictating';
+    }
+
+    endDictation(): void {
+        this.resetRunState();
+    }
+
+    suppressNextWrite(text: string): void {
+        this.state.suppressedClipboardText = text;
+    }
+
+    enterWriteCooldown(): void {
+        this.enterCooldown();
     }
 
     private async handleClipboardUpdate(newText: string): Promise<void> {
