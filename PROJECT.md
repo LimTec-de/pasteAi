@@ -6,3 +6,9 @@
 - `frontmost.rs`: remember macOS pid / Windows HWND; `paste_into_frontmost` restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it
 - Triple-empty-copy / `copy_observer.rs` removed. Dictation still uses stored `openaiApiKey` regardless of `llmType`
 - Mic: `src-tauri/Info.plist` `NSMicrophoneUsageDescription` + `Entitlements.plist` `audio-input`/`microphone`
+
+## Deps pins — 2026-08-27
+- `typescript` held at `^6.0.3` (svelte-check). `pnpm-workspace.yaml` `overrides.valibot: 1.4.2`; `minimumReleaseAgeExclude: openai@7.7.0`. Windows crate `0.62` (`frontmost.rs` HWND/SendInput).
+
+## CI publish workflow — 2026-08-27
+- `.github/workflows/build.yml` runners: `macos-latest`, `ubuntu-latest`, `windows-latest`. `pnpm/setup@v2` (`runtime: node@24`, `packageManager` 11.24.0). `tauri-apps/tauri-action@v1` (`uploadUpdaterJson`). Linux glibc follows whatever `ubuntu-latest` is (currently 24.04).

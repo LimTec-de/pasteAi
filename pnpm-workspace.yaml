@@ -4,5 +4,8 @@ packages:
 allowBuilds:
   esbuild: true
 
+minimumReleaseAgeExclude:
+  - openai@7.7.0
+
 overrides:
-  valibot: 1.2.0
+  valibot: 1.4.2

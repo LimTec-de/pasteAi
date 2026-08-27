@@ -1,6 +1,6 @@
 [package]
 name = "pasteAI"
-version = "0.12.1"
+version = "0.13.12"
 description = "AI powered clipboard improvement tool"
 authors = ["Sebastian Igerl"]
 edition = "2021"
@@ -45,7 +45,7 @@ core-foundation = "0.10"
 objc2-core-graphics = { version = "0.3", features = ["CGEvent", "CGEventTypes", "CGRemoteOperation"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_UI_WindowsAndMessaging"

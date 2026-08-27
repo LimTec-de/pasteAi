@@ -16,3 +16,21 @@
 - Cmd+V via `CGEvent` + `kCGHIDEventTap` needs Accessibility (post events), not Input Monitoring
 - Accessory policy hides TCC dialogs; prompt on main thread after `Regular` + `NSApplication.activate`
 - Tahoe Settings URL: `x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility` (https://github.com/paralevel/macos-settings-urls)
+
+## TypeScript 7 vs svelte-check — 2026-08-27
+- npm `latest` = 7.0.2; no stable programmatic API. svelte-check 4.7.6 peers `typescript ^5 || ^6`; crashes on 7 (`typescript.default.sys` undefined). Last 6.x = 6.0.3. `--tsgo` needs both 6+7. Stay on ^6.0.3. https://github.com/sveltejs/language-tools/issues/3063 https://www.npmjs.com/package/svelte-check
+
+## openai 7 — 2026-08-27
+- 7.0.0 breaking: Node.js 22+ only (20 EOL). `chat.completions.create` + `dangerouslyAllowBrowser` unchanged through 7.7.0. CI node 24 OK. https://github.com/openai/openai-node/releases/tag/v7.0.0
+
+## pnpm 12 vs 11 — 2026-08-27
+- 12.0.0 stable 2026-08-26 (Rust rewrite) but npm `latest` still 11.24.0; install via `next-12`. Stay on 11.24.0. https://pnpm.io/installation https://pnpm.io/blog/whats-different-in-pnpm-12
+
+## GitHub Actions runners — 2026-08-27
+- `ubuntu-22.04` deprecation 2026-09-17, unsupported 2027-04-17. `ubuntu-latest`=`ubuntu-24.04`; `ubuntu-26.04` public preview only. `macos-latest`=`macos-26`; `windows-latest`=`windows-2025`. https://github.com/actions/runner-images/issues/14254 https://github.com/actions/runner-images/issues/14226 https://github.com/actions/runner-images
+
+## tauri-action v1 — 2026-08-27
+- Latest `action-v1.0.0`. Drops Tauri v1. `includeUpdaterJson`→`uploadUpdaterJson`; drop `includeDebug` (`args: --debug`). `.app.tar.gz` names include version. Official pipeline example still shows `ubuntu-22.04`. https://github.com/tauri-apps/tauri-action/releases/tag/action-v1.0.0 https://v2.tauri.app/distribute/pipelines/github/
+
+## pnpm/setup v2 — 2026-08-27
+- Successor to `pnpm/action-setup` for pnpm 11+. Replaces `actions/setup-node` via `runtime: node@24`. Reads `packageManager`. pnpm 11 has no darwin-x64 binary (ARM `macos-latest` OK). https://github.com/pnpm/setup
