@@ -12,7 +12,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     email: '',
     showStart: true,
     improveHtml: true,
-    dictateShortcut: CONFIG.DEFAULT_DICTATE_SHORTCUT
+    dictateShortcut: CONFIG.DEFAULT_DICTATE_SHORTCUT,
+    dictationProvider: 'openai'
 };
 
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
@@ -25,7 +26,8 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     email: 'email',
     showStart: 'showStart',
     improveHtml: 'improveHtml',
-    dictateShortcut: 'dictateShortcut'
+    dictateShortcut: 'dictateShortcut',
+    dictationProvider: 'dictationProvider'
 };
 
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
@@ -140,9 +142,13 @@ export class SettingsRepository {
     private normalizeSetting<K extends keyof AppSettings>(key: K, value: unknown): AppSettings[K] {
         switch (key) {
             case 'llmType':
-                return (value === 'openai' || value === 'ollama' || value === 'pasteai'
+                return (value === 'openai' || value === 'ollama' || value === 'pasteai' || value === 'apple'
                     ? value
                     : DEFAULT_SETTINGS.llmType) as AppSettings[K];
+            case 'dictationProvider':
+                return (value === 'openai' || value === 'apple'
+                    ? value
+                    : DEFAULT_SETTINGS.dictationProvider) as AppSettings[K];
             case 'openaiApiKey':
             case 'ollamaUrl':
             case 'ollamaModel':

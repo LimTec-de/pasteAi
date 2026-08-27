@@ -6,6 +6,7 @@ import { APP_EVENTS, type DictateCommitPayload } from '../app/events';
 import { CONFIG } from '../config';
 import { ProviderGateway } from '../domain/provider-gateway';
 import { SettingsRepository } from '../domain/settings-repository';
+import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import type { StatusType } from '../domain/types';
 import { AppWindows } from '../platform/windows';
 import { ClipboardImprover } from './clipboard-improver';
@@ -134,7 +135,55 @@ export class DictationController {
     }
 
     private async beginSession(): Promise<void> {
-        const apiKey = (await this.settingsRepository.get('openaiApiKey')).trim();
+        const settings = await this.settingsRepository.getAll();
+        const shortcut = settings.dictateShortcut.trim() || CONFIG.DEFAULT_DICTATE_SHORTCUT;
+
+        if (settings.dictationProvider === 'apple') {
+            const availability = await getAppleSpeechAvailability();
+            if (!availability.available) {
+                this.holdIntent = false;
+                this.latched = false;
+                await this.showStatus(availability.message, 'error');
+                await this.windows.openDashboard('providers');
+                return;
+            }
+
+            this.clipboardImprover.beginDictation();
+            await this.windows.hideStatus();
+            await invoke('remember_frontmost_app').catch((error) => {
+                console.warn('Could not remember frontmost app:', error);
+            });
+
+            try {
+                await startAppleDictation();
+                if (this.cancelled) {
+                    await cancelAppleDictation().catch(() => undefined);
+                    return;
+                }
+
+                await this.windows.showDictate({ engine: 'apple', shortcut });
+                await invoke('restore_frontmost_app').catch((error) => {
+                    console.warn('Could not restore frontmost app:', error);
+                });
+
+                if (!this.holdIntent && !this.cancelled && !this.latched) {
+                    await this.windows.requestDictateFinish();
+                }
+            } catch (error) {
+                console.error('Could not start dictation:', error);
+                this.holdIntent = false;
+                this.latched = false;
+                this.clipboardImprover.endDictation();
+                await cancelAppleDictation().catch(() => undefined);
+                await this.showStatus(
+                    `Could not start dictation: ${error instanceof Error ? error.message : String(error)}`,
+                    'error'
+                );
+            }
+            return;
+        }
+
+        const apiKey = settings.openaiApiKey.trim();
         if (!apiKey) {
             this.holdIntent = false;
             this.latched = false;
@@ -142,9 +191,6 @@ export class DictationController {
             await this.windows.openDashboard('providers');
             return;
         }
-
-        const shortcut = (await this.settingsRepository.get('dictateShortcut')).trim()
-            || CONFIG.DEFAULT_DICTATE_SHORTCUT;
 
         this.clipboardImprover.beginDictation();
         await this.windows.hideStatus();
@@ -158,7 +204,7 @@ export class DictationController {
                 return;
             }
 
-            await this.windows.showDictate(clientSecret, shortcut);
+            await this.windows.showDictate({ engine: 'openai', clientSecret, shortcut });
             await invoke('restore_frontmost_app').catch((error) => {
                 console.warn('Could not restore frontmost app:', error);
             });
@@ -225,6 +271,7 @@ export class DictationController {
         this.holdIntent = false;
         this.latched = false;
         this.stoppingLatch = false;
+        await cancelAppleDictation().catch(() => undefined);
         await this.windows.hideDictate();
         this.clipboardImprover.endDictation();
         await invoke('restore_frontmost_app').catch((error) => {

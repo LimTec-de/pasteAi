@@ -187,12 +187,11 @@ export class AppWindows {
         return selectionPromise;
     }
 
-    async showDictate(clientSecret: string, shortcut: string): Promise<void> {
+    async showDictate(payload: DictateOpenPayload): Promise<void> {
         const dictateWindow = await this.ensureWindow('dictate');
         await this.tryWindowCall('resize dictate window', () => dictateWindow.setSize(
             new LogicalSize(WINDOW_CONFIG.dictate.width, WINDOW_CONFIG.dictate.height)
         ));
-        const payload: DictateOpenPayload = { clientSecret, shortcut };
         await dictateWindow.emit(APP_EVENTS.DICTATE_OPEN, payload);
         await this.revealWindow(dictateWindow, { focus: false, promoteToFront: true });
     }

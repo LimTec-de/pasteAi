@@ -7,3 +7,15 @@ commands.allow = [
     "paste_into_frontmost",
     "open_accessibility_settings"
 ]
+
+[[permission]]
+identifier = "allow-apple-system"
+description = "Use on-device Apple Intelligence and speech recognition"
+commands.allow = [
+    "apple_text_availability",
+    "apple_speech_availability",
+    "apple_improve",
+    "apple_dictation_start",
+    "apple_dictation_stop",
+    "apple_dictation_cancel"
+]

@@ -3,6 +3,7 @@ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { CONFIG } from '../config';
 import { SettingsRepository } from './settings-repository';
 import type { AppSettings, PasteAIQuota } from './types';
+import { improveWithApple } from './apple-system';
 
 interface PasteAIErrorResponse {
     status: 'error';
@@ -68,6 +69,8 @@ export class ProviderGateway {
                 return this.improveWithOpenAI(text, systemPrompt, settings);
             case 'ollama':
                 return this.improveWithOllama(text, systemPrompt, settings);
+            case 'apple':
+                return improveWithApple(systemPrompt, text);
         }
     }
 

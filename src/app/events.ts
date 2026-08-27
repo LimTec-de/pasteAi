@@ -37,7 +37,8 @@ export interface AnswerDisplayPayload {
 }
 
 export interface DictateOpenPayload {
-    clientSecret: string;
+    engine: 'openai' | 'apple';
+    clientSecret?: string;
     shortcut: string;
 }
 

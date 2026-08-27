@@ -87,8 +87,14 @@
 
 .provider-grid {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.75rem;
+}
+
+.provider-card-wrap {
+    display: grid;
+    gap: 0.4rem;
+    align-content: start;
 }
 
 .provider-card {
@@ -105,7 +111,7 @@
         background-color var(--transition-standard);
 }
 
-.provider-card:hover {
+.provider-card:hover:not(:disabled) {
     border-color: var(--color-border-strong);
     background: var(--color-surface-raised);
 }
@@ -113,6 +119,19 @@
 .provider-card.is-active {
     border-color: var(--color-accent);
     background: var(--color-accent-soft);
+}
+
+.provider-card:disabled,
+.provider-card.is-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.provider-card__reason {
+    margin: 0;
+    color: var(--color-muted);
+    line-height: 1.45;
+    font-size: 0.78rem;
 }
 
 .provider-card__label {

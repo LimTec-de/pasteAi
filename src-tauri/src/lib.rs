@@ -1,3 +1,4 @@
+mod apple;
 mod frontmost;
 
 use std::process::exit;
@@ -47,7 +48,13 @@ pub fn run() {
             frontmost::remember_frontmost_app,
             frontmost::restore_frontmost_app,
             frontmost::paste_into_frontmost,
-            frontmost::open_accessibility_settings
+            frontmost::open_accessibility_settings,
+            apple::apple_text_availability,
+            apple::apple_speech_availability,
+            apple::apple_improve,
+            apple::apple_dictation_start,
+            apple::apple_dictation_stop,
+            apple::apple_dictation_cancel
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

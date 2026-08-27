@@ -4,5 +4,7 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>pasteAI uses the microphone to dictate text into your clipboard.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>pasteAI uses on-device speech recognition to dictate text into your clipboard.</string>
 </dict>
 </plist>

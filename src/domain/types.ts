@@ -1,4 +1,6 @@
-export type ProviderId = 'pasteai' | 'openai' | 'ollama';
+export type ProviderId = 'pasteai' | 'openai' | 'ollama' | 'apple';
+
+export type DictationProviderId = 'openai' | 'apple';
 
 export type ManagedWindowId = 'dashboard' | 'prompt' | 'status' | 'answer' | 'dictate';
 
@@ -15,6 +17,7 @@ export interface AppSettings {
     showStart: boolean;
     improveHtml: boolean;
     dictateShortcut: string;
+    dictationProvider: DictationProviderId;
 }
 
 export type PromptOutputMode = 'clipboard' | 'window';

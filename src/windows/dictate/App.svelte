@@ -1,13 +1,16 @@
 <script lang="ts">
-    import { emitTo } from '@tauri-apps/api/event';
+    import { emitTo, listen } from '@tauri-apps/api/event';
     import { Window } from '@tauri-apps/api/window';
     import { onMount, tick } from 'svelte';
     import { APP_EVENTS, type DictateCommitPayload, type DictateOpenPayload, type WindowReadyPayload } from '../../app/events';
+    import { cancelAppleDictation, stopAppleDictation } from '../../domain/apple-system';
     import { LiveTranscriptionSession } from '../../features/live-transcription';
     import { formatAcceleratorForDisplay } from '../../platform/shortcut';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     let session: LiveTranscriptionSession | null = null;
+    let unlistenLevel: (() => void) | undefined;
+    let engine: DictateOpenPayload['engine'] = 'openai';
     let committedByItem = new Map<string, string>();
     let committedOrder: string[] = [];
     let partialByItem = new Map<string, string>();
@@ -41,12 +44,28 @@
         finishing = false;
     }
 
-    async function startSession(clientSecret: string, shortcut: string): Promise<void> {
+    async function startSession(payload: DictateOpenPayload): Promise<void> {
         stopSession();
         resetTranscript();
-        shortcutLabel = formatAcceleratorForDisplay(shortcut);
+        engine = payload.engine;
+        shortcutLabel = formatAcceleratorForDisplay(payload.shortcut);
         statusMessage = 'Recording started';
 
+        if (engine === 'apple') {
+            unlistenLevel = await listen<{ level: number }>('apple-dictate-level', (event) => {
+                level = event.payload.level;
+                receiving = event.payload.level > 0.06;
+            });
+            return;
+        }
+
+        if (!payload.clientSecret) {
+            errorMessage = 'Transcription session missing';
+            statusMessage = 'Could not start microphone';
+            return;
+        }
+
+        const clientSecret = payload.clientSecret;
         const nextSession = new LiveTranscriptionSession({
             onDelta(itemId, delta) {
                 if (!committedOrder.includes(itemId)) {
@@ -89,6 +108,8 @@
     }
 
     function stopSession(): void {
+        unlistenLevel?.();
+        unlistenLevel = undefined;
         session?.stop();
         session = null;
         receiving = false;
@@ -106,6 +127,23 @@
 
         finishing = true;
         await hideWindow();
+
+        if (engine === 'apple') {
+            try {
+                const text = (await stopAppleDictation()).trim();
+                stopSession();
+                const payload: DictateCommitPayload = { text };
+                await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
+            } catch (error) {
+                stopSession();
+                const payload: DictateCommitPayload = {
+                    text: '',
+                    error: error instanceof Error ? error.message : String(error)
+                };
+                await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
+            }
+            return;
+        }
 
         try {
             await session?.commitAndWait();
@@ -132,6 +170,9 @@
         }
 
         finishing = true;
+        if (engine === 'apple') {
+            await cancelAppleDictation().catch(() => undefined);
+        }
         stopSession();
         await emitTo('main', APP_EVENTS.DICTATE_CANCEL);
         await hideWindow();
@@ -155,7 +196,7 @@
             const currentWindow = Window.getCurrent();
 
             unlistenOpen = await currentWindow.listen<DictateOpenPayload>(APP_EVENTS.DICTATE_OPEN, (event) => {
-                void startSession(event.payload.clientSecret, event.payload.shortcut);
+                void startSession(event.payload);
             });
             unlistenHide = await currentWindow.listen(APP_EVENTS.DICTATE_HIDE, () => {
                 stopSession();

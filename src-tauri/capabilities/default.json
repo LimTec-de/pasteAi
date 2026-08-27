@@ -60,6 +60,8 @@
     "http:allow-fetch-send",
     "http:allow-fetch-read-body",
     "allow-frontmost-app",
+    "allow-apple-system",
+    "core:event:allow-listen",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
     "global-shortcut:allow-unregister"

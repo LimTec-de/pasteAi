@@ -11,7 +11,8 @@
     import { PromptRepository } from '../../domain/prompt-repository';
     import { DEFAULT_SETTINGS, SettingsRepository } from '../../domain/settings-repository';
     import { ProviderGateway } from '../../domain/provider-gateway';
-    import type { AppSettings, DashboardSection, PromptOption, PromptOutputMode, ProviderId } from '../../domain/types';
+    import type { AppSettings, DashboardSection, DictationProviderId, PromptOption, PromptOutputMode, ProviderId } from '../../domain/types';
+    import { getAppleSpeechAvailability, getAppleTextAvailability, type AppleAvailability, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -47,6 +48,8 @@
 
     let ollamaAvailable = true;
     let ollamaModels: string[] = [];
+    let appleTextAvailability: AppleAvailability = UNAVAILABLE_ON_MAC;
+    let appleSpeechAvailability: AppleAvailability = UNAVAILABLE_ON_MAC;
     let recordingShortcut = false;
     let shortcutMessage = '';
     let shortcutIsError = false;
@@ -100,6 +103,7 @@
         scrollActiveSectionToTop(section);
         if (section === 'providers') {
             void refreshProviderState();
+            void refreshAppleAvailability();
         }
     }
 
@@ -131,6 +135,7 @@
 
         await refreshPromptState();
         await refreshProviderState();
+        await refreshAppleAvailability();
     }
 
     async function refreshPromptState(preferredPromptId?: number | null): Promise<void> {
@@ -221,8 +226,31 @@
         }
     }
 
+    async function refreshAppleAvailability(): Promise<void> {
+        try {
+            appleTextAvailability = await getAppleTextAvailability();
+            appleSpeechAvailability = await getAppleSpeechAvailability();
+        } catch (error) {
+            console.error('Could not check Apple Intelligence availability:', error);
+            appleTextAvailability = UNAVAILABLE_ON_MAC;
+            appleSpeechAvailability = UNAVAILABLE_ON_MAC;
+        }
+    }
+
     async function handleProviderSelect(provider: ProviderId): Promise<void> {
+        if (provider === 'apple' && !appleTextAvailability.available) {
+            return;
+        }
+
         await updateSettings({ llmType: provider }, true);
+    }
+
+    async function handleDictationProviderSelect(provider: DictationProviderId): Promise<void> {
+        if (provider === 'apple' && !appleSpeechAvailability.available) {
+            return;
+        }
+
+        await updateSettings({ dictationProvider: provider });
     }
 
     async function handleOpenAIKeyChange(): Promise<void> {
@@ -418,6 +446,7 @@
     onMount(() => {
         let unlistenOpen: (() => void) | undefined;
         let unlistenCloseRequested: (() => void) | undefined;
+        let unlistenFocus: (() => void) | undefined;
 
         void (async () => {
             const currentWindow = Window.getCurrent();
@@ -428,6 +457,11 @@
             unlistenCloseRequested = await currentWindow.onCloseRequested(async (event) => {
                 event.preventDefault();
                 await currentWindow.hide();
+            });
+            unlistenFocus = await currentWindow.onFocusChanged(({ payload: focused }) => {
+                if (focused) {
+                    void refreshAppleAvailability();
+                }
             });
 
             const payload: WindowReadyPayload = { windowId: 'dashboard' };
@@ -445,6 +479,7 @@
         return () => {
             unlistenOpen?.();
             unlistenCloseRequested?.();
+            unlistenFocus?.();
             window.removeEventListener('keydown', handleShortcutKeydown, true);
         };
     });
@@ -538,11 +573,11 @@
                         <div class="welcome-tips fade-up">
                             <article class="callout-card start-callout">
                                 <h3>Dictate at the cursor</h3>
-                                <p>Hold the dictate shortcut (default {settings.dictateShortcut}) and speak. Release to insert the transcript where you were typing and copy it to the clipboard. A short tap keeps the window open — click Done when you are finished. Set the shortcut in Settings. Needs an OpenAI API key, even if rewrites use PasteAI or Ollama.</p>
+                                <p>Hold the dictate shortcut (default {settings.dictateShortcut}) and speak. Release to insert the transcript where you were typing and copy it to the clipboard. A short tap keeps the window open — click Done when you are finished. Set the rewrite provider and dictation engine in Settings. On-device Mac options need macOS 26.</p>
                             </article>
                             <article class="callout-card start-callout">
                                 <h3>Keep it private</h3>
-                                <p>Switch to Ollama to keep text improvements on your own machine.</p>
+                                <p>Switch to Apple Intelligence or Ollama to keep text improvements on this machine.</p>
                             </article>
                             <article class="callout-card start-callout">
                                 <h3>Pick a style each time</h3>
@@ -582,12 +617,66 @@
                                 </div>
                                 <p>Route text through a local model for offline or private improvement workflows.</p>
                             </button>
+                            <div class="provider-card-wrap">
+                                <button
+                                    class:is-active={settings.llmType === 'apple'}
+                                    class:is-disabled={!appleTextAvailability.available}
+                                    class="provider-card"
+                                    type="button"
+                                    disabled={!appleTextAvailability.available}
+                                    on:click={() => void handleProviderSelect('apple')}
+                                >
+                                    <div class="provider-card__label">
+                                        <strong>Apple Intelligence</strong>
+                                        <span class="chip chip--muted">On-device</span>
+                                    </div>
+                                    <p>Rewrite with the system model already on this Mac. No API key, no cloud call.</p>
+                                </button>
+                                {#if !appleTextAvailability.available}
+                                    <p class="provider-card__reason">{appleTextAvailability.message}</p>
+                                {/if}
+                            </div>
+                        </div>
+
+                        <div class="section-heading">
+                            <span class="section-kicker">Dictation</span>
+                            <h2>Choose how speech becomes text.</h2>
+                            <p>Independent from rewrite. On-device dictation uses the Mac speech model, not Apple Intelligence.</p>
+                        </div>
+
+                        <div class="provider-grid">
+                            <button class:is-active={settings.dictationProvider === 'openai'} class="provider-card" type="button" on:click={() => void handleDictationProviderSelect('openai')}>
+                                <div class="provider-card__label">
+                                    <strong>OpenAI</strong>
+                                    <span class="chip chip--muted">API key</span>
+                                </div>
+                                <p>Hold-to-talk transcription with gpt-transcribe. Needs an OpenAI API key.</p>
+                            </button>
+                            <div class="provider-card-wrap">
+                                <button
+                                    class:is-active={settings.dictationProvider === 'apple'}
+                                    class:is-disabled={!appleSpeechAvailability.available}
+                                    class="provider-card"
+                                    type="button"
+                                    disabled={!appleSpeechAvailability.available}
+                                    on:click={() => void handleDictationProviderSelect('apple')}
+                                >
+                                    <div class="provider-card__label">
+                                        <strong>Mac (on-device)</strong>
+                                        <span class="chip chip--muted">On-device</span>
+                                    </div>
+                                    <p>Dictate with the speech model already on this Mac. No API key.</p>
+                                </button>
+                                {#if !appleSpeechAvailability.available}
+                                    <p class="provider-card__reason">{appleSpeechAvailability.message}</p>
+                                {/if}
+                            </div>
                         </div>
 
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <label for="apiKey">OpenAI API key</label>
-                                <span>Required for dictation. Also used when OpenAI is the rewrite provider.</span>
+                                <span>Required when OpenAI is selected for rewrite or dictation.</span>
                             </div>
                             <input id="apiKey" type="password" bind:value={settings.openaiApiKey} placeholder="sk-..." on:change={() => void handleOpenAIKeyChange()}>
                         </section>
@@ -935,8 +1024,8 @@
                             </article>
                             <article class="panel-card">
                                 <span class="section-kicker">Providers</span>
-                                <h3>PasteAI, OpenAI, or Ollama</h3>
-                                <p>A managed account, your own API key, or a local model.</p>
+                                <h3>PasteAI, OpenAI, Ollama, or Apple</h3>
+                                <p>A managed account, your own API key, a local model, or on-device Apple Intelligence.</p>
                             </article>
                         </div>
 

@@ -54,6 +54,7 @@
     "macOS": {
       "exceptionDomain": "localhost",
       "frameworks": [],
+      "minimumSystemVersion": "13.0",
       "entitlements": "./Entitlements.plist"
     },
     "windows": {

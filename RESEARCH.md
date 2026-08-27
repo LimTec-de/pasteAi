@@ -34,3 +34,17 @@
 
 ## pnpm/setup v2 — 2026-08-27
 - Successor to `pnpm/action-setup` for pnpm 11+. Replaces `actions/setup-node` via `runtime: node@24`. Reads `packageManager`. pnpm 11 has no darwin-x64 binary (ARM `macos-latest` OK). https://github.com/pnpm/setup
+
+## Apple Foundation Models (on-device LLM) — 2026-08-27
+- Swift `FoundationModels`: `SystemLanguageModel.default` + `LanguageModelSession`; same ~3B Apple Intelligence model, Neural Engine, no API key, offline. macOS/iOS/iPadOS 26+, Apple Intelligence on, Apple silicon only (Intel Macs no). Check `availability` (`.available` / `.deviceNotEligible` / `.modelNotReady`). https://developer.apple.com/documentation/foundationmodels https://www.apple.com/newsroom/2025/09/apples-foundation-models-framework-unlocks-new-intelligent-app-experiences/
+- Context 4096 tokens (instructions+prompt+output). Suited to rewrite/summarize/extract; not GPT-4-class reasoning. PCC `PrivateCloudComputeLanguageModel` = larger context/reasoning, still no OpenAI key, data to Apple PCC. German supported with Apple Intelligence langs (macOS 26.1+). https://developer.apple.com/documentation/foundationmodels/managing-the-context-window https://support.apple.com/en-us/121115
+- Tauri: Swift C-ABI object + `build.rs`. TBD `libswift_Concurrency` uses `$ld$previous$@rpath` for minOS 10.9–12.0 and 13.1–15.0. Rust default minos 11.0 → dyld `Library not loaded: @rpath/libswift_Concurrency.dylib`. Fix: `MACOSX_DEPLOYMENT_TARGET=13.0` (gap between those ranges) so install-name stays `/usr/lib/swift/libswift_Concurrency.dylib`; also `-Wl,-rpath,/usr/lib/swift`. https://github.com/Brendonovich/swift-rs/issues/69
+
+## Apple SpeechAnalyzer — 2026-08-27
+- macOS 26 Speech: `SpeechAnalyzer` (actor) + `SpeechTranscriber` (long-form) / `DictationTranscriber` (short utterances). `supportedLocale(equivalentTo:)` is async. `cancelAndFinishNow()` needs await. Finish live input with `inputBuilder.finish()` then `finalizeAndFinishThroughEndOfInput()` — finishing the stream alone does not end the session. Assets: `AssetInventory.assetInstallationRequest` / `reserve(locale:)`. Hold-to-talk paragraphs → SpeechTranscriber preset `.transcription`. https://developer.apple.com/documentation/speech/speechanalyzer
+
+## Windows on-device LanguageModel (Phi Silica → Aion Instruct) — 2026-08-27
+- WinAppSDK `Microsoft.Windows.AI.Text.LanguageModel` + skills `TextRewriter`/`TextSummarizer`. Copilot+ NPU preinstalled; GPU (RTX 30+/RX 9060+ 6GB, Dev Mode, Insider exp) on-demand GB download via `EnsureReadyAsync`. No CPU. Not China. Phi Silica is LAF (unlock token); Aion Instruct rolls Insiders Oct 2026 / retail Nov 2026, no LAF, then Phi Silica removed. Packaged MSIX + `systemAIModels`. https://learn.microsoft.com/en-us/windows/ai/apis/phi-silica https://learn.microsoft.com/en-us/windows/ai/apis/
+
+## Windows AI SpeechRecognition — 2026-08-27
+- `Microsoft.Windows.AI.Speech.SpeechRecognitionModel`: batch + streaming. NPU preinstalled on Copilot+; CPU on other Win11 24H2+ (on-demand download, no GPU). Streaming via `StreamingRecognition`. MSIX `systemAIModels`. https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition
