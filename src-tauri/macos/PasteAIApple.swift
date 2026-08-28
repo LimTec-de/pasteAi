@@ -3,6 +3,7 @@ import AudioToolbox
 import CoreAudio
 import Darwin
 import Foundation
+import NaturalLanguage
 
 #if canImport(FoundationModels)
 import FoundationModels
@@ -263,12 +264,20 @@ private func improveMac26(system: String, text: String) async throws -> String {
         throw NSError(domain: "pasteAI", code: 2, userInfo: [NSLocalizedDescriptionKey: "Apple Intelligence is not available on this Mac."])
     }
 
-    let session = LanguageModelSession(instructions: system)
+    let session = LanguageModelSession(instructions: appleInstructions(system: system, text: text))
     let response = try await session.respond(to: text)
     return response.content
 #else
     throw NSError(domain: "pasteAI", code: 2, userInfo: [NSLocalizedDescriptionKey: "Requires macOS 26 or later."])
 #endif
+}
+
+private func appleInstructions(system: String, text: String) -> String {
+    guard let language = NLLanguageRecognizer.dominantLanguage(for: text) else {
+        return system
+    }
+    let name = Locale(identifier: "en").localizedString(forLanguageCode: language.rawValue) ?? language.rawValue
+    return "\(system)\nYou MUST write the edited text in \(name)."
 }
 
 private func improveErrorMessage(_ error: Error) -> String {

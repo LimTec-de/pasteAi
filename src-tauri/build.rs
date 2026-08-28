@@ -61,6 +61,7 @@ fn compile_macos_swift() {
     println!("cargo:rustc-link-lib=framework=AVFoundation");
     println!("cargo:rustc-link-lib=framework=CoreAudio");
     println!("cargo:rustc-link-lib=framework=AudioToolbox");
+    println!("cargo:rustc-link-lib=framework=NaturalLanguage");
     println!("cargo:rustc-link-arg=-Wl,-weak_framework,FoundationModels");
     println!("cargo:rustc-link-arg=-Wl,-weak_framework,Speech");
 
