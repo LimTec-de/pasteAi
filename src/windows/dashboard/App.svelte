@@ -55,6 +55,7 @@
     let shortcutIsError = false;
     let microphoneDevices: AudioInputDevice[] = [];
     let microphoneMessage = '';
+    let speechAssetPoll: ReturnType<typeof setInterval> | null = null;
 
     let version = 'Loading version...';
     let welcomeSectionElement: HTMLElement | null = null;
@@ -247,6 +248,27 @@
             appleTextAvailability = UNAVAILABLE_ON_MAC;
             appleSpeechAvailability = UNAVAILABLE_ON_MAC;
         }
+        syncSpeechAssetPoll();
+    }
+
+    function stopSpeechAssetPoll(): void {
+        if (speechAssetPoll !== null) {
+            clearInterval(speechAssetPoll);
+            speechAssetPoll = null;
+        }
+    }
+
+    function syncSpeechAssetPoll(): void {
+        if (appleSpeechAvailability.reasonCode !== 'assetsNotReady') {
+            stopSpeechAssetPoll();
+            return;
+        }
+        if (speechAssetPoll !== null) {
+            return;
+        }
+        speechAssetPoll = setInterval(() => {
+            void refreshAppleAvailability();
+        }, 2000);
     }
 
     async function handleProviderSelect(provider: ProviderId): Promise<void> {
@@ -536,6 +558,7 @@
             unlistenFocus?.();
             window.removeEventListener('keydown', handleShortcutKeydown, true);
             navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
+            stopSpeechAssetPoll();
         };
     });
 </script>
@@ -725,7 +748,7 @@
                                     </div>
                                     <p>Dictate with the speech model already on this Mac. No API key.</p>
                                 </button>
-                                {#if !appleSpeechAvailability.available}
+                                {#if appleSpeechAvailability.message}
                                     <p class="provider-card__reason">{appleSpeechAvailability.message}</p>
                                 {/if}
                             </div>
@@ -835,7 +858,7 @@
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <label for="dictateLanguage">Language</label>
-                                <span>Auto keeps German and English hints for OpenAI, and the Mac system locale for on-device dictation.</span>
+                                <span>Auto uses German and English. On-device dictation runs both and keeps the better transcript.</span>
                             </div>
                             <select id="dictateLanguage" bind:value={settings.dictateLanguage} on:change={() => void handleDictateLanguageChange()}>
                                 <option value="auto">Auto</option>

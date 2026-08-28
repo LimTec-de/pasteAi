@@ -307,46 +307,241 @@ private func speechAvailabilityMac26() async -> Availability {
         return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
     }
 
-    guard let locale = await resolveSpeechLocale(language: "auto") else {
+    guard let locale = await resolveSpeechLocales(language: "auto").first else {
         return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
     }
 
-    let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-    do {
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            Task {
-                try? await request.downloadAndInstall()
-            }
-            return Availability(false, "assetsNotReady", "macOS is still installing on-device speech recognition.")
-        }
-    } catch {
-        return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
-    }
-
-    return Availability(true, "available", "")
+    return await SpeechAssetInstaller.shared.availability(locale: locale)
 #else
     return Availability(false, "osTooOld", "Requires macOS 26 or later.")
 #endif
 }
 
 @available(macOS 26.0, *)
-private func resolveSpeechLocale(language: String) async -> Locale? {
+private func resolveSpeechLocales(language: String) async -> [Locale] {
 #if canImport(Speech)
     let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
+    let hints: [String]
     if !trimmed.isEmpty && trimmed != "auto" {
-        return await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: trimmed))
+        switch trimmed {
+        case "de":
+            hints = ["de_DE"]
+        case "en":
+            hints = ["en_US"]
+        default:
+            hints = [trimmed]
+        }
+    } else {
+        hints = autoSpeechHints()
     }
-    if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale.current) {
-        return locale
+
+    var locales: [Locale] = []
+    var seen = Set<String>()
+    for hint in hints {
+        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: hint)) else {
+            continue
+        }
+        if seen.insert(locale.identifier(.bcp47)).inserted {
+            locales.append(locale)
+        }
     }
-    if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: "en_US")) {
-        return locale
-    }
-    return await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: "de_DE"))
+    return locales
 #else
-    return nil
+    return []
 #endif
 }
+
+@available(macOS 26.0, *)
+private func autoSpeechHints() -> [String] {
+    var hints: [String] = []
+    func add(_ identifier: String) {
+        if !hints.contains(identifier) {
+            hints.append(identifier)
+        }
+    }
+
+    let codes = (Locale.preferredLanguages + [Locale.current.identifier]).compactMap { identifier -> String? in
+        Locale(identifier: identifier).language.languageCode?.identifier
+    }
+    if codes.contains("de") {
+        add("de_DE")
+    }
+    if codes.contains("en") {
+        add("en_US")
+    }
+    add("de_DE")
+    add("en_US")
+    return hints
+}
+
+#if canImport(Speech)
+@available(macOS 26.0, *)
+private func speechTranscriberPreset() -> SpeechTranscriber.Preset {
+    var preset = SpeechTranscriber.Preset.transcription
+    preset.attributeOptions.insert(.transcriptionConfidence)
+    return preset
+}
+
+@available(macOS 26.0, *)
+private func meanSpeechConfidence(_ text: AttributedString) -> Double? {
+    var total = 0.0
+    var count = 0
+    for run in text.runs {
+        if let value = run.transcriptionConfidence {
+            total += value
+            count += 1
+        }
+    }
+    return count > 0 ? total / Double(count) : nil
+}
+
+@available(macOS 26.0, *)
+private final class TranscriptLane: @unchecked Sendable {
+    let transcriber: SpeechTranscriber
+    let locale: Locale
+    var finalParts: [String] = []
+    var volatile = ""
+    var confidenceTotal = 0.0
+    var confidenceCount = 0
+
+    init(transcriber: SpeechTranscriber, locale: Locale) {
+        self.transcriber = transcriber
+        self.locale = locale
+    }
+
+    var text: String {
+        (finalParts + [volatile])
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var meanConfidence: Double {
+        confidenceCount > 0 ? confidenceTotal / Double(confidenceCount) : 0
+    }
+}
+#endif
+
+#if canImport(Speech)
+@available(macOS 26.0, *)
+private final class SpeechAssetInstaller: @unchecked Sendable {
+    static let shared = SpeechAssetInstaller()
+
+    private let lock = NSLock()
+    private var inFlight: [String: Task<Void, Error>] = [:]
+    private var succeeded: Set<String> = []
+    private var errors: [String: String] = [:]
+    private var progress: [String: Progress] = [:]
+
+    func availability(locale: Locale) async -> Availability {
+        let key = localeKey(locale)
+        let transcriber = SpeechTranscriber(locale: locale, preset: speechTranscriberPreset())
+        if isSucceeded(key) {
+            return Availability(true, "available", "")
+        }
+        if await assetsReady(transcriber: transcriber, locale: locale) {
+            return Availability(true, "available", "")
+        }
+
+        lock.lock()
+        let flying = inFlight[key] != nil
+        let error = errors[key]
+        let message = progressMessageLocked(key)
+        lock.unlock()
+
+        if flying {
+            return Availability(true, "assetsNotReady", message)
+        }
+        if let error {
+            return Availability(false, "assetsFailed", error)
+        }
+
+        startIfNeeded(locale: locale, key: key)
+        return Availability(true, "assetsNotReady", message)
+    }
+
+    func ensureInstalled(locale: Locale) async throws {
+        let key = localeKey(locale)
+        if isSucceeded(key) {
+            return
+        }
+        let transcriber = SpeechTranscriber(locale: locale, preset: speechTranscriberPreset())
+        if await assetsReady(transcriber: transcriber, locale: locale) {
+            return
+        }
+        try await taskFor(locale: locale, key: key).value
+    }
+
+    private func startIfNeeded(locale: Locale, key: String) {
+        _ = taskFor(locale: locale, key: key)
+    }
+
+    private func taskFor(locale: Locale, key: String) -> Task<Void, Error> {
+        lock.lock()
+        if let existing = inFlight[key] {
+            lock.unlock()
+            return existing
+        }
+        errors[key] = nil
+        let task = Task<Void, Error> {
+            do {
+                try await AssetInventory.reserve(locale: locale)
+                let transcriber = SpeechTranscriber(locale: locale, preset: speechTranscriberPreset())
+                if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
+                    self.lock.lock()
+                    self.progress[key] = request.progress
+                    self.lock.unlock()
+                    try await request.downloadAndInstall()
+                }
+                self.lock.lock()
+                self.succeeded.insert(key)
+                self.errors[key] = nil
+                self.progress[key] = nil
+                self.inFlight[key] = nil
+                self.lock.unlock()
+            } catch {
+                self.lock.lock()
+                self.succeeded.remove(key)
+                self.errors[key] = error.localizedDescription
+                self.progress[key] = nil
+                self.inFlight[key] = nil
+                self.lock.unlock()
+                throw error
+            }
+        }
+        inFlight[key] = task
+        lock.unlock()
+        return task
+    }
+
+    private func isSucceeded(_ key: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return succeeded.contains(key)
+    }
+
+    private func localeKey(_ locale: Locale) -> String {
+        locale.identifier(.bcp47)
+    }
+
+    private func assetsReady(transcriber: SpeechTranscriber, locale: Locale) async -> Bool {
+        if await AssetInventory.status(forModules: [transcriber]) == .installed {
+            return true
+        }
+        let wanted = localeKey(locale)
+        let installed = await SpeechTranscriber.installedLocales
+        return installed.contains { $0.identifier(.bcp47) == wanted }
+    }
+
+    private func progressMessageLocked(_ key: String) -> String {
+        let fraction = progress[key]?.fractionCompleted ?? 0
+        if fraction > 0 && fraction < 1 {
+            return "macOS is still installing on-device speech recognition (\(Int((fraction * 100).rounded()))%)."
+        }
+        return "macOS is still installing on-device speech recognition."
+    }
+}
+#endif
 
 @available(macOS 26.0, *)
 private final class DictationSession: @unchecked Sendable {
@@ -354,14 +549,12 @@ private final class DictationSession: @unchecked Sendable {
 
     private let lock = NSLock()
     private var engine: AVAudioEngine?
-    private var transcriber: SpeechTranscriber?
+    private var lanes: [TranscriptLane] = []
     private var analyzer: SpeechAnalyzer?
     private var inputBuilder: AsyncStream<AnalyzerInput>.Continuation?
     private var resultsTask: Task<Void, Never>?
-    private var reservedLocale: Locale?
+    private var reservedLocales: [Locale] = []
     private var converter: AVAudioConverter?
-    private var finalParts: [String] = []
-    private var volatile = ""
     private var levelCb: PasteAILevelCallback?
     private var levelCtx: UnsafeMutableRawPointer?
     private var running = false
@@ -387,70 +580,112 @@ private final class DictationSession: @unchecked Sendable {
             let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
             return !trimmed.isEmpty && trimmed != "auto"
         }()
-        guard let locale = await resolveSpeechLocale(language: language) else {
+        let locales = await resolveSpeechLocales(language: language)
+        guard !locales.isEmpty else {
             if specifiedLanguage {
                 throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition does not support this language."])
             }
             throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
         }
 
-        try await AssetInventory.reserve(locale: locale)
-        let transcriber = SpeechTranscriber(locale: locale, preset: .transcription)
-        if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-            try await request.downloadAndInstall()
+        var installed: [Locale] = []
+        for locale in locales {
+            do {
+                try await SpeechAssetInstaller.shared.ensureInstalled(locale: locale)
+                installed.append(locale)
+            } catch {
+                if installed.isEmpty {
+                    throw error
+                }
+                break
+            }
         }
 
-        guard let audioFormat = await SpeechAnalyzer.bestAvailableAudioFormat(compatibleWith: [transcriber]) else {
-            await AssetInventory.release(reservedLocale: locale)
-            throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
+        let preset = speechTranscriberPreset()
+        let lanes = installed.map { locale in
+            TranscriptLane(transcriber: SpeechTranscriber(locale: locale, preset: preset), locale: locale)
         }
-
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
-        let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
-        try await analyzer.start(inputSequence: inputSequence)
+        let modules: [any SpeechModule] = lanes.map(\.transcriber)
 
         let engine = AVAudioEngine()
         let input = engine.inputNode
         if !deviceUID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             try setEngineInputDevice(engine, uid: deviceUID)
         }
-        let hwFormat = input.outputFormat(forBus: 0)
-        let converter = AVAudioConverter(from: hwFormat, to: audioFormat)
+        engine.prepare()
+        let hwFormat = try microphoneFormat(input)
+        guard let audioFormat = await SpeechAnalyzer.bestAvailableAudioFormat(
+            compatibleWith: modules,
+            considering: hwFormat
+        ) else {
+            for locale in installed {
+                await AssetInventory.release(reservedLocale: locale)
+            }
+            throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
+        }
+
+        let converter: AVAudioConverter?
+        if formatsMatch(hwFormat, audioFormat) {
+            converter = nil
+        } else {
+            guard let created = AVAudioConverter(from: hwFormat, to: audioFormat) else {
+                for locale in installed {
+                    await AssetInventory.release(reservedLocale: locale)
+                }
+                throw NSError(domain: "pasteAI", code: 4, userInfo: [NSLocalizedDescriptionKey: "Could not convert microphone audio."])
+            }
+            created.primeMethod = .none
+            converter = created
+        }
+
+        let analyzer = SpeechAnalyzer(modules: modules)
+        try await analyzer.prepareToAnalyze(in: audioFormat)
+        let (inputSequence, inputBuilder) = AsyncStream.makeStream(of: AnalyzerInput.self)
 
         lock.lock()
         self.levelCb = levelCb
         self.levelCtx = ctx
         self.engine = engine
-        self.transcriber = transcriber
+        self.lanes = lanes
         self.analyzer = analyzer
         self.inputBuilder = inputBuilder
-        self.reservedLocale = locale
+        self.reservedLocales = installed
         self.converter = converter
-        self.finalParts = []
-        self.volatile = ""
         self.running = true
         lock.unlock()
 
         resultsTask = Task { [weak self] in
             guard let self else { return }
-            do {
-                for try await result in transcriber.results {
-                    let piece = String(result.text.characters)
-                    self.lock.lock()
-                    if result.isFinal {
-                        self.finalParts.append(piece)
-                        self.volatile = ""
-                    } else {
-                        self.volatile = piece
+            await withTaskGroup(of: Void.self) { group in
+                for lane in lanes {
+                    group.addTask {
+                        do {
+                            for try await result in lane.transcriber.results {
+                                let piece = String(result.text.characters)
+                                let confidence = meanSpeechConfidence(result.text)
+                                self.lock.lock()
+                                if result.isFinal {
+                                    lane.finalParts.append(piece)
+                                    lane.volatile = ""
+                                } else {
+                                    lane.volatile = piece
+                                }
+                                if let confidence {
+                                    lane.confidenceTotal += confidence
+                                    lane.confidenceCount += 1
+                                }
+                                self.lock.unlock()
+                            }
+                        } catch {
+                            // Result stream ends when the analyzer finishes or fails.
+                        }
                     }
-                    self.lock.unlock()
                 }
-            } catch {
-                // Result stream ends when the analyzer finishes or fails.
             }
         }
 
-        input.installTap(onBus: 0, bufferSize: 1024, format: hwFormat) { [weak self] buffer, _ in
+        try await analyzer.start(inputSequence: inputSequence)
+        input.installTap(onBus: 0, bufferSize: 4096, format: hwFormat) { [weak self] buffer, _ in
             self?.handleBuffer(buffer, analyzerFormat: audioFormat)
         }
         try engine.start()
@@ -474,22 +709,19 @@ private final class DictationSession: @unchecked Sendable {
         let analyzer = self.analyzer
         let inputBuilder = self.inputBuilder
         let resultsTask = self.resultsTask
-        let locale = self.reservedLocale
+        let locales = reservedLocales
+        let lanes = self.lanes
         let wasRunning = running
         self.engine = nil
         self.analyzer = nil
         self.inputBuilder = nil
         self.resultsTask = nil
-        self.transcriber = nil
+        self.lanes = []
         self.converter = nil
-        self.reservedLocale = nil
+        self.reservedLocales = []
         self.levelCb = nil
         self.levelCtx = nil
         self.running = false
-        let parts = finalParts
-        let volatile = self.volatile
-        finalParts = []
-        self.volatile = ""
         lock.unlock()
 
         guard wasRunning else {
@@ -508,12 +740,45 @@ private final class DictationSession: @unchecked Sendable {
 
         _ = await resultsTask?.value
 
-        if let locale {
+        for locale in locales {
             await AssetInventory.release(reservedLocale: locale)
         }
 
-        let combined = (parts + [volatile]).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-        return combined.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return pickTranscript(lanes)
+    }
+
+    private func pickTranscript(_ lanes: [TranscriptLane]) -> String {
+        func score(_ lane: TranscriptLane) -> Double {
+            let text = lane.text
+            guard !text.isEmpty else {
+                return -1
+            }
+            var value = lane.meanConfidence
+            if let code = lane.locale.language.languageCode?.identifier,
+               NLLanguageRecognizer.dominantLanguage(for: text)?.rawValue.hasPrefix(code) == true {
+                value += 0.2
+            }
+            return value
+        }
+        return lanes.max { score($0) < score($1) }?.text ?? ""
+    }
+
+    private func microphoneFormat(_ input: AVAudioInputNode) throws -> AVAudioFormat {
+        let hardware = input.inputFormat(forBus: 0)
+        if hardware.sampleRate >= 1, hardware.channelCount >= 1 {
+            return hardware
+        }
+        let output = input.outputFormat(forBus: 0)
+        if output.sampleRate >= 1, output.channelCount >= 1 {
+            return output
+        }
+        throw NSError(domain: "pasteAI", code: 5, userInfo: [NSLocalizedDescriptionKey: "Could not access the microphone."])
+    }
+
+    private func formatsMatch(_ left: AVAudioFormat, _ right: AVAudioFormat) -> Bool {
+        left.sampleRate == right.sampleRate
+            && left.channelCount == right.channelCount
+            && left.commonFormat == right.commonFormat
     }
 
     private func handleBuffer(_ buffer: AVAudioPCMBuffer, analyzerFormat: AVAudioFormat) {
@@ -527,6 +792,9 @@ private final class DictationSession: @unchecked Sendable {
 
         do {
             let converted = try convert(buffer, to: analyzerFormat, converter: converter)
+            guard converted.frameLength > 0 else {
+                return
+            }
             builder.yield(AnalyzerInput(buffer: converted))
         } catch {
             // Drop a buffer rather than killing the session on a single conversion miss.
@@ -538,9 +806,7 @@ private final class DictationSession: @unchecked Sendable {
         to format: AVAudioFormat,
         converter: AVAudioConverter?
     ) throws -> AVAudioPCMBuffer {
-        if buffer.format.sampleRate == format.sampleRate
-            && buffer.format.channelCount == format.channelCount
-            && buffer.format.commonFormat == format.commonFormat {
+        if formatsMatch(buffer.format, format) {
             return buffer
         }
 
@@ -567,6 +833,9 @@ private final class DictationSession: @unchecked Sendable {
         }
         if let error {
             throw error
+        }
+        guard output.frameLength > 0 else {
+            throw NSError(domain: "pasteAI", code: 4, userInfo: [NSLocalizedDescriptionKey: "Could not convert microphone audio."])
         }
         return output
     }
