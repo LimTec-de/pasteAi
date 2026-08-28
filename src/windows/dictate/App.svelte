@@ -253,6 +253,9 @@
         <p class="dictate-status">{errorMessage || statusMessage}</p>
         <p class="dictate-hint">{holdLine}</p>
         <p class="dictate-hint">{actionLine}</p>
+        {#if !errorMessage}
+            <p class="dictate-learn">Correct a word after insert, then copy the text once. pasteAI can offer to save that spelling as a dictionary rule.</p>
+        {/if}
 
         <div class="dictate-footer">
             <button class="app-button app-button--secondary" type="button" on:click={() => void cancel()}>Cancel</button>

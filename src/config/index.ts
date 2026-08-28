@@ -76,7 +76,7 @@ export const WINDOW_CONFIG: WindowConfig = {
     },
     dictate: {
         width: 380,
-        height: 312,
+        height: 360,
         title: 'Dictate'
     }
 };

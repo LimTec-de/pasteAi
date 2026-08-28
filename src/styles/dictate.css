@@ -65,6 +65,15 @@
     margin-top: -0.45rem;
 }
 
+.dictate-learn {
+    margin: 0;
+    max-width: 20.5rem;
+    text-align: center;
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    line-height: 1.45;
+}
+
 .dictate-footer {
     display: flex;
     justify-content: center;

@@ -2,7 +2,7 @@
 
 ## Hold-to-dictate shortcut — 2026-08-27
 - Dedicated global shortcut (`dictateShortcut`, default `CommandOrControl+Shift+Space`). Hold = listen, release = clipboard + paste (`dictateOutputMode=insert` default) or copy only (`clipboard`). Short tap (<450ms) keeps overlay open with Done. Both insert flows write clipboard then Cmd/Ctrl+V. Second shortcut press also finishes (must run before `isBusy`). Never register Copy/C. Do not preview-commit while holding.
-- Overlay must not take focus (`showDictate` focus false + immediate `restore_frontmost_app`) or `Released` from tauri-plugin-global-shortcut 2.3.2 is unreliable
+- Overlay must not take focus (`showDictate` focus false + immediate `restore_frontmost_app`) or `Released` from tauri-plugin-global-shortcut 2.3.2 is unreliable. Size 380×360. Learn-from-copy hint in overlay (`dictate-learn`): correct after insert, copy once → Add/Skip toast; hide when overlay shows an error.
 - `frontmost.rs`: remember macOS pid / Windows HWND; `paste_into_frontmost` restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it
 - Triple-empty-copy / `copy_observer.rs` removed. Dictation uses `dictationProvider` (`openai` default, `apple` on-device SpeechAnalyzer). Rewrite `llmType` can be `apple` (Foundation Models). No silent fallback; unavailable options are disabled in Settings.
 - Mic: `src-tauri/Info.plist` `NSMicrophoneUsageDescription` + `Entitlements.plist` `audio-input`/`microphone`
