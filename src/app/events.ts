@@ -44,6 +44,7 @@ export interface DictateOpenPayload {
     shortcut: string;
     languages: string[];
     keywords: string[];
+    transcriptionPrompt: string;
     microphoneId: string;
     outputMode: DictateOutputMode;
 }

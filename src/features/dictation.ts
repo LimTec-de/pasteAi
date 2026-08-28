@@ -10,7 +10,7 @@ import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import type { StatusType } from '../domain/types';
 import { transcriptionLanguages } from '../domain/types';
-import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords } from '../domain/dictate-dictionary';
+import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords, transcriptionPrompt } from '../domain/dictate-dictionary';
 import { AppWindows } from '../platform/windows';
 import { ClipboardImprover } from './clipboard-improver';
 
@@ -142,7 +142,8 @@ export class DictationController {
         const settings = await this.settingsRepository.getAll();
         const shortcut = settings.dictateShortcut.trim() || CONFIG.DEFAULT_DICTATE_SHORTCUT;
         const languages = transcriptionLanguages(settings);
-        const keywords = transcriptionKeywords(settings.dictateVocabulary);
+        const keywords = transcriptionKeywords(settings.dictateVocabulary, settings.dictateReplacements);
+        const transcriptionHint = transcriptionPrompt(settings.dictateVocabulary, settings.dictateReplacements);
         const microphoneId = settings.dictateMicrophoneId.trim();
         const outputMode = settings.dictateOutputMode;
 
@@ -174,6 +175,7 @@ export class DictationController {
                     shortcut,
                     languages,
                     keywords,
+                    transcriptionPrompt: transcriptionHint,
                     microphoneId,
                     outputMode
                 });
@@ -225,6 +227,7 @@ export class DictationController {
                 shortcut,
                 languages,
                 keywords,
+                transcriptionPrompt: transcriptionHint,
                 microphoneId,
                 outputMode
             });

@@ -47,7 +47,7 @@
 
 ## STT dictionary (SuperWhisper / Wispr) — 2026-08-28
 - SuperWhisper Vocabulary tab: words = STT hints; replacements = case-insensitive post-STT swap. Emails = replacements (`my work email` → address), not a command grammar. Docs: https://superwhisper.com/docs/get-started/interface-vocabulary
-- OpenAI `gpt-transcribe` `keywords` = spoken terms only, not replacement output (don’t send emails). https://developers.openai.com/api/docs/guides/transcription#improve-transcription-quality
+- OpenAI `gpt-transcribe` `keywords` = spoken terms only, not replacement output (don’t send emails). `prompt` = free-form recording context (topic/setting/preferred terms), not a restatement of the transcription task. pasteAI appends dictionary preferred terms + `"heard" → write` substitutions to that prompt (cap 1200 chars) so rules bias recognition, not only post-replace. Docs: https://developers.openai.com/api/docs/guides/transcription#improve-transcription-quality
 - Wispr auto-learn is desktop field-edit via Accessibility (before/selected/after cursor); undo toast, no confirm. Copy-diff is the clipboard analogue. https://docs.wisprflow.ai/articles/4052411709-teach-flow-your-words-with-the-dictionary https://docs.wisprflow.ai/articles/4678293671-feature-context-awareness
 
 ## Windows on-device LanguageModel (Phi Silica → Aion Instruct) — 2026-08-27

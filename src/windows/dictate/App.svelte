@@ -101,6 +101,7 @@
             await nextSession.start(clientSecret, {
                 languages: payload.languages,
                 keywords: payload.keywords,
+                prompt: payload.transcriptionPrompt,
                 microphoneId: payload.microphoneId || undefined
             });
             if (session === nextSession) {

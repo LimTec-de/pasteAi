@@ -1,3 +1,5 @@
+import { BASE_TRANSCRIPTION_PROMPT } from '../domain/dictate-dictionary';
+
 const TARGET_SAMPLE_RATE = 24000;
 const PCM_CHUNK_SAMPLES = 2400;
 const WORKLET_SOURCE = `
@@ -15,7 +17,11 @@ registerProcessor('pcm-processor', PcmProcessor);
 
 const COMMIT_TIMEOUT_MS = 15_000;
 
-export function transcriptionSessionUpdate(languages: string[], keywords: string[] = []) {
+export function transcriptionSessionUpdate(
+    languages: string[],
+    keywords: string[] = [],
+    prompt = BASE_TRANSCRIPTION_PROMPT
+) {
     return {
         type: 'session.update',
         session: {
@@ -28,7 +34,7 @@ export function transcriptionSessionUpdate(languages: string[], keywords: string
                     },
                     transcription: {
                         model: 'gpt-transcribe',
-                        prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
+                        prompt,
                         languages,
                         ...(keywords.length > 0 ? { keywords } : {})
                     },
@@ -70,7 +76,7 @@ export class LiveTranscriptionSession {
 
     constructor(private readonly handlers: TranscriptionHandlers) {}
 
-    async start(clientSecret: string, options: { languages: string[]; keywords?: string[]; microphoneId?: string }): Promise<void> {
+    async start(clientSecret: string, options: { languages: string[]; keywords?: string[]; prompt?: string; microphoneId?: string }): Promise<void> {
         const audio: MediaTrackConstraints = {
             echoCancellation: true,
             noiseSuppression: true,
@@ -92,7 +98,11 @@ export class LiveTranscriptionSession {
                 return;
             }
 
-            this.socket?.send(JSON.stringify(transcriptionSessionUpdate(options.languages, options.keywords ?? [])));
+            this.socket?.send(JSON.stringify(transcriptionSessionUpdate(
+                options.languages,
+                options.keywords ?? [],
+                options.prompt
+            )));
             this.ready = true;
         });
 

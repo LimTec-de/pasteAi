@@ -3,6 +3,8 @@ import type { DictateReplacement, DictionaryLearnPair } from './types';
 const KEYWORD_FORBIDDEN = /[<>\r\n]/;
 const MAX_KEYWORDS = 50;
 const MAX_KEYWORD_CHARS = 64;
+export const BASE_TRANSCRIPTION_PROMPT = 'Desktop dictation into the clipboard. Transcribe speech as written text.';
+const MAX_TRANSCRIPTION_PROMPT_CHARS = 1200;
 const MAX_LEARN_PAIRS = 4;
 const MAX_LEARN_TOKENS = 8;
 const MAX_EMAIL_FROM_TOKENS = 12;
@@ -75,23 +77,66 @@ export function normalizeReplacements(value: unknown): DictateReplacement[] {
     return replacements;
 }
 
-export function transcriptionKeywords(vocabulary: string[]): string[] {
+export function transcriptionKeywords(
+    vocabulary: string[],
+    replacements: DictateReplacement[] = []
+): string[] {
     const keywords: string[] = [];
     const seen = new Set<string>();
-    for (const word of vocabulary) {
-        if (keywords.length >= MAX_KEYWORDS) {
-            break;
-        }
 
-        if (!isValidKeyword(word) || seen.has(word)) {
-            continue;
+    const consider = (word: string) => {
+        if (keywords.length >= MAX_KEYWORDS || !isValidKeyword(word) || seen.has(word)) {
+            return;
         }
 
         seen.add(word);
         keywords.push(word);
+    };
+
+    for (const word of vocabulary) {
+        consider(word);
+    }
+
+    for (const replacement of replacements) {
+        if (isSpeakableTerm(replacement.to)) {
+            consider(replacement.to);
+        } else if (isSpeakableTerm(replacement.from)) {
+            consider(replacement.from);
+        }
     }
 
     return keywords;
+}
+
+export function transcriptionPrompt(
+    vocabulary: string[],
+    replacements: DictateReplacement[] = []
+): string {
+    let prompt = BASE_TRANSCRIPTION_PROMPT;
+    const preferred = uniqueTerms([
+        ...vocabulary,
+        ...replacements.map((replacement) => replacement.to).filter((to) => isSpeakableTerm(to))
+    ]).slice(0, 40);
+    prompt = appendPromptPart(prompt, preferred.length > 0 ? `Preferred terms: ${preferred.join(', ')}.` : '');
+
+    const hints: string[] = [];
+    for (const replacement of replacements.slice(0, 20)) {
+        const hint = `"${replacement.from}" → ${replacement.to}`;
+        const next = hints.length === 0
+            ? `Spoken substitutions: ${hint}.`
+            : `Spoken substitutions: ${hints.join('; ')}; ${hint}.`;
+        if (prompt.length + 1 + next.length > MAX_TRANSCRIPTION_PROMPT_CHARS) {
+            break;
+        }
+
+        hints.push(hint);
+    }
+
+    if (hints.length > 0) {
+        prompt = appendPromptPart(prompt, `Spoken substitutions: ${hints.join('; ')}.`);
+    }
+
+    return prompt;
 }
 
 export function isSpeakableTerm(value: string): boolean {
@@ -172,6 +217,30 @@ export function inspectCopiedDictation(
     }
 
     return { similar: true, pairs };
+}
+
+function uniqueTerms(values: string[]): string[] {
+    const seen = new Set<string>();
+    const terms: string[] = [];
+    for (const value of values) {
+        const term = value.trim();
+        if (term.length === 0 || seen.has(term)) {
+            continue;
+        }
+
+        seen.add(term);
+        terms.push(term);
+    }
+
+    return terms;
+}
+
+function appendPromptPart(prompt: string, part: string): string {
+    if (part.length === 0 || prompt.length + 1 + part.length > MAX_TRANSCRIPTION_PROMPT_CHARS) {
+        return prompt;
+    }
+
+    return `${prompt} ${part}`;
 }
 
 function isValidKeyword(word: string): boolean {

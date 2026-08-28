@@ -1158,7 +1158,7 @@
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <div id="dictate-rules-label">Dictionary rules</div>
-                                <span>If the transcript contains the left phrase, replace it with the right. Applied after rewrite, even when Don’t rewrite is on. Copy a corrected dictation once to be asked to add a rule.</span>
+                                <span>Heard → Write. OpenAI uses these as recognition hints from the start (transcription prompt plus keywords). After speech they are still replaced, including on Apple and when Don’t rewrite is on. Copy a corrected dictation once to be asked to add a rule.</span>
                             </div>
                             <div class="dictionary-rule-row" role="group" aria-labelledby="dictate-rules-label">
                                 <input
