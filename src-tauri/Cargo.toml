@@ -32,6 +32,10 @@ tauri-plugin-notification = "2"
 #https://crosscopy.github.io/tauri-plugin-clipboard/
 tauri-plugin-clipboard = "2"
 tauri-plugin-http = "2"
+sherpa-onnx = { version = "1.13.6", default-features = false }
+ureq = "3.4.0"
+tar = "0.4.46"
+bzip2 = "0.6.1"
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"

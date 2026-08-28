@@ -2,14 +2,23 @@
     import { emitTo, listen } from '@tauri-apps/api/event';
     import { Window } from '@tauri-apps/api/window';
     import { onMount, tick } from 'svelte';
-    import { APP_EVENTS, type DictateCommitPayload, type DictateOpenPayload, type WindowReadyPayload } from '../../app/events';
+    import {
+        APP_EVENTS,
+        type DictateCommitPayload,
+        type DictateOpenPayload,
+        type DictateSessionPayload,
+        type WindowReadyPayload
+    } from '../../app/events';
     import { cancelAppleDictation, stopAppleDictation } from '../../domain/apple-system';
-    import { LiveTranscriptionSession } from '../../features/live-transcription';
+    import { transcribeLocalStt } from '../../domain/local-stt';
+    import { LiveTranscriptionSession, MicrophoneCapture } from '../../features/live-transcription';
     import { formatAcceleratorForDisplay } from '../../platform/shortcut';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     let session: LiveTranscriptionSession | null = null;
+    let capture: MicrophoneCapture | null = null;
     let unlistenLevel: (() => void) | undefined;
+    let openPayload: DictateOpenPayload | null = null;
     let engine: DictateOpenPayload['engine'] = 'openai';
     let outputMode: DictateOpenPayload['outputMode'] = 'insert';
     let committedByItem = new Map<string, string>();
@@ -45,30 +54,8 @@
         finishing = false;
     }
 
-    async function startSession(payload: DictateOpenPayload): Promise<void> {
-        stopSession();
-        resetTranscript();
-        engine = payload.engine;
-        outputMode = payload.outputMode;
-        shortcutLabel = formatAcceleratorForDisplay(payload.shortcut);
-        statusMessage = 'Recording started';
-
-        if (engine === 'apple') {
-            unlistenLevel = await listen<{ level: number }>('apple-dictate-level', (event) => {
-                level = event.payload.level;
-                receiving = event.payload.level > 0.06;
-            });
-            return;
-        }
-
-        if (!payload.clientSecret) {
-            errorMessage = 'Transcription session missing';
-            statusMessage = 'Could not start microphone';
-            return;
-        }
-
-        const clientSecret = payload.clientSecret;
-        const nextSession = new LiveTranscriptionSession({
+    function createOpenAiSession(): LiveTranscriptionSession {
+        return new LiveTranscriptionSession({
             onDelta(itemId, delta) {
                 if (!committedOrder.includes(itemId)) {
                     committedOrder = [...committedOrder, itemId];
@@ -94,18 +81,56 @@
                 statusMessage = 'Dictation failed';
             }
         });
+    }
 
+    async function startSession(payload: DictateOpenPayload): Promise<void> {
+        stopSession();
+        resetTranscript();
+        openPayload = payload;
+        engine = payload.engine;
+        outputMode = payload.outputMode;
+        shortcutLabel = formatAcceleratorForDisplay(payload.shortcut);
+        statusMessage = 'Starting microphone…';
+
+        if (engine === 'apple') {
+            unlistenLevel = await listen<{ level: number }>('apple-dictate-level', (event) => {
+                level = event.payload.level;
+                receiving = event.payload.level > 0.06;
+            });
+            return;
+        }
+
+        if (engine === 'local') {
+            const nextCapture = new MicrophoneCapture((nextLevel) => {
+                level = nextLevel;
+                receiving = nextLevel > 0.06;
+            });
+            capture = nextCapture;
+            try {
+                await nextCapture.start(payload.microphoneId || undefined);
+                if (capture === nextCapture) {
+                    statusMessage = 'Recording started';
+                }
+            } catch (error) {
+                errorMessage = error instanceof Error ? error.message : String(error);
+                statusMessage = 'Could not start microphone';
+                stopSession();
+            }
+            return;
+        }
+
+        const nextSession = createOpenAiSession();
         session = nextSession;
 
         try {
-            await nextSession.start(clientSecret, {
-                languages: payload.languages,
-                keywords: payload.keywords,
-                prompt: payload.transcriptionPrompt,
-                microphoneId: payload.microphoneId || undefined
-            });
-            if (session === nextSession) {
-                statusMessage = 'Recording started';
+            await nextSession.startMic({ microphoneId: payload.microphoneId || undefined });
+            if (session !== nextSession) {
+                return;
+            }
+
+            statusMessage = 'Recording started';
+            if (payload.clientSecret) {
+                await attachOpenAiSecret(payload.clientSecret);
             }
         } catch (error) {
             errorMessage = error instanceof Error ? error.message : String(error);
@@ -114,11 +139,39 @@
         }
     }
 
+    async function attachOpenAiSecret(clientSecret: string): Promise<void> {
+        const payload = openPayload;
+        const nextSession = session;
+        if (!payload || !nextSession) {
+            return;
+        }
+
+        try {
+            await nextSession.connect(clientSecret, {
+                languages: payload.languages,
+                keywords: payload.keywords,
+                prompt: payload.transcriptionPrompt
+            });
+        } catch (error) {
+            errorMessage = error instanceof Error ? error.message : String(error);
+            statusMessage = 'Dictation failed';
+            stopSession();
+        }
+    }
+
+    function markReady(): void {
+        if (!errorMessage) {
+            statusMessage = 'Recording started';
+        }
+    }
+
     function stopSession(): void {
         unlistenLevel?.();
         unlistenLevel = undefined;
         session?.stop();
         session = null;
+        capture?.stop();
+        capture = null;
         receiving = false;
         level = 0;
     }
@@ -133,6 +186,29 @@
         }
 
         finishing = true;
+
+        if (engine === 'local') {
+            statusMessage = 'Transcribing…';
+            const recorded = capture?.takePcm16();
+            stopSession();
+            try {
+                const text = recorded && recorded.pcm.length > 0
+                    ? (await transcribeLocalStt(recorded.pcm, recorded.sampleRate)).trim()
+                    : '';
+                await hideWindow();
+                const payload: DictateCommitPayload = { text };
+                await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
+            } catch (error) {
+                await hideWindow();
+                const payload: DictateCommitPayload = {
+                    text: '',
+                    error: error instanceof Error ? error.message : String(error)
+                };
+                await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
+            }
+            return;
+        }
+
         await hideWindow();
 
         if (engine === 'apple') {
@@ -153,6 +229,9 @@
         }
 
         try {
+            if (session && !session.isConnected()) {
+                await session.waitUntilConnected();
+            }
             await session?.commitAndWait();
         } catch (error) {
             stopSession();
@@ -194,6 +273,8 @@
 
     onMount(() => {
         let unlistenOpen: (() => void) | undefined;
+        let unlistenSession: (() => void) | undefined;
+        let unlistenReady: (() => void) | undefined;
         let unlistenHide: (() => void) | undefined;
         let unlistenLatch: (() => void) | undefined;
         let unlistenFinish: (() => void) | undefined;
@@ -204,6 +285,12 @@
 
             unlistenOpen = await currentWindow.listen<DictateOpenPayload>(APP_EVENTS.DICTATE_OPEN, (event) => {
                 void startSession(event.payload);
+            });
+            unlistenSession = await currentWindow.listen<DictateSessionPayload>(APP_EVENTS.DICTATE_SESSION, (event) => {
+                void attachOpenAiSecret(event.payload.clientSecret);
+            });
+            unlistenReady = await currentWindow.listen(APP_EVENTS.DICTATE_READY, () => {
+                markReady();
             });
             unlistenHide = await currentWindow.listen(APP_EVENTS.DICTATE_HIDE, () => {
                 stopSession();
@@ -228,6 +315,8 @@
 
         return () => {
             unlistenOpen?.();
+            unlistenSession?.();
+            unlistenReady?.();
             unlistenHide?.();
             unlistenLatch?.();
             unlistenFinish?.();

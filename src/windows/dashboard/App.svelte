@@ -25,6 +25,7 @@
         type SpeechLanguageCatalog
     } from '../../domain/types';
     import { getAppleSpeechAvailability, getAppleTextAvailability, installSpeechLanguage, listAppleInputDevices, listSpeechLanguages, type AppleAvailability, type AudioInputDevice, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
+    import { getLocalSttStatus, installLocalStt, type LocalSttStatus } from '../../domain/local-stt';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -62,6 +63,15 @@
     let ollamaModels: string[] = [];
     let appleTextAvailability: AppleAvailability = UNAVAILABLE_ON_MAC;
     let appleSpeechAvailability: AppleAvailability = UNAVAILABLE_ON_MAC;
+    let localSttStatus: LocalSttStatus = {
+        installed: false,
+        downloading: false,
+        phase: '',
+        loaded: false,
+        bytes: 0,
+        total: 0,
+        message: ''
+    };
     let recordingShortcut = false;
     let shortcutMessage = '';
     let shortcutIsError = false;
@@ -72,6 +82,7 @@
     let languageMessage = '';
     let installingLanguage: string | null = null;
     let speechAssetPoll: ReturnType<typeof setInterval> | null = null;
+    let localSttPoll: ReturnType<typeof setInterval> | null = null;
     let vocabularyDraft = '';
     let ruleFromDraft = '';
     let ruleToDraft = '';
@@ -137,6 +148,7 @@
         if (section === 'providers') {
             void refreshProviderState();
             void refreshAppleAvailability();
+            void refreshLocalSttStatus();
         }
         if (section === 'dictation') {
             void refreshMicrophones();
@@ -177,6 +189,7 @@
         await healDictatePromptId();
         await refreshProviderState();
         await refreshAppleAvailability();
+        await refreshLocalSttStatus();
         await refreshSpeechLanguages();
     }
 
@@ -314,6 +327,62 @@
         }
 
         await updateSettings({ dictationProvider: provider });
+        void refreshMicrophones();
+        if (provider === 'local' && !localSttStatus.installed) {
+            void downloadLocalStt();
+        }
+    }
+
+    async function refreshLocalSttStatus(): Promise<void> {
+        try {
+            localSttStatus = await getLocalSttStatus();
+        } catch (error) {
+            console.error('Could not check local speech status:', error);
+            localSttStatus = {
+                installed: false,
+                downloading: false,
+                phase: '',
+                loaded: false,
+                bytes: 0,
+                total: 0,
+                message: error instanceof Error ? error.message : 'Could not check local speech status.'
+            };
+        }
+        syncLocalSttPoll();
+    }
+
+    async function downloadLocalStt(): Promise<void> {
+        try {
+            await installLocalStt();
+            await refreshLocalSttStatus();
+        } catch (error) {
+            localSttStatus = {
+                ...localSttStatus,
+                downloading: false,
+                phase: '',
+                message: error instanceof Error ? error.message : 'Could not download speech model.'
+            };
+        }
+    }
+
+    function stopLocalSttPoll(): void {
+        if (localSttPoll !== null) {
+            clearInterval(localSttPoll);
+            localSttPoll = null;
+        }
+    }
+
+    function syncLocalSttPoll(): void {
+        if (!localSttStatus.downloading) {
+            stopLocalSttPoll();
+            return;
+        }
+        if (localSttPoll !== null) {
+            return;
+        }
+        localSttPoll = setInterval(() => {
+            void refreshLocalSttStatus();
+        }, 2000);
     }
 
     async function handleOpenAIKeyChange(): Promise<void> {
@@ -685,6 +754,8 @@
         let unlistenFocus: (() => void) | undefined;
         let unlistenSettings: (() => void) | undefined;
 
+        let unlistenLocalStt: (() => void) | undefined;
+
         void (async () => {
             const currentWindow = Window.getCurrent();
 
@@ -694,6 +765,10 @@
             unlistenSettings = await listen(APP_EVENTS.SETTINGS_CHANGED, async () => {
                 await settingsRepository.reload();
                 settings = await settingsRepository.getAll();
+            });
+            unlistenLocalStt = await listen<LocalSttStatus>('local-stt-status', (event) => {
+                localSttStatus = event.payload;
+                syncLocalSttPoll();
             });
             unlistenCloseRequested = await currentWindow.onCloseRequested(async (event) => {
                 event.preventDefault();
@@ -728,9 +803,11 @@
             unlistenCloseRequested?.();
             unlistenFocus?.();
             unlistenSettings?.();
+            unlistenLocalStt?.();
             window.removeEventListener('keydown', handleShortcutKeydown, true);
             navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
             stopSpeechAssetPoll();
+            stopLocalSttPoll();
         };
     });
 </script>
@@ -894,7 +971,7 @@
                         <div class="section-heading">
                             <span class="section-kicker">Dictation</span>
                             <h2>Choose how speech becomes text.</h2>
-                            <p>Independent from rewrite. On-device dictation uses the Mac speech model, not Apple Intelligence.</p>
+                            <p>Independent from rewrite. Mac on-device uses Apple Speech. Parakeet is the offline engine for Windows, Linux, and Mac.</p>
                         </div>
 
                         <div class="provider-grid">
@@ -922,6 +999,38 @@
                                 </button>
                                 {#if appleSpeechAvailability.message}
                                     <p class="provider-card__reason">{appleSpeechAvailability.message}</p>
+                                {/if}
+                            </div>
+                            <div class="provider-card-wrap">
+                                <button
+                                    class:is-active={settings.dictationProvider === 'local'}
+                                    class="provider-card"
+                                    type="button"
+                                    on:click={() => void handleDictationProviderSelect('local')}
+                                >
+                                    <div class="provider-card__label">
+                                        <strong>On-device (Parakeet)</strong>
+                                        <span class="chip chip--muted">Local</span>
+                                    </div>
+                                    <p>NVIDIA Parakeet TDT v3 on this computer. Works on Windows, Linux, and Mac. One ~660 MB download, no API key.</p>
+                                </button>
+                                {#if localSttStatus.downloading}
+                                    <p class="provider-card__reason">
+                                        {#if localSttStatus.phase === 'extract'}
+                                            Extracting speech model… This can take a minute.
+                                        {:else if localSttStatus.phase === 'load'}
+                                            Loading speech model…
+                                        {:else if localSttStatus.total > 0}
+                                            Downloading… {Math.min(100, Math.round((localSttStatus.bytes / localSttStatus.total) * 100))}%
+                                        {:else}
+                                            {localSttStatus.message || 'Downloading speech model…'}
+                                        {/if}
+                                    </p>
+                                {:else if localSttStatus.message}
+                                    <p class="provider-card__reason">{localSttStatus.message}</p>
+                                {/if}
+                                {#if !localSttStatus.installed && !localSttStatus.downloading}
+                                    <button class="app-button app-button--secondary" type="button" on:click={() => void downloadLocalStt()}>Download model</button>
                                 {/if}
                             </div>
                         </div>
@@ -1030,7 +1139,13 @@
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <div id="dictate-languages-label">Languages</div>
-                                <span>Filled chips are used for dictation. Outline chips stay downloaded but idle. At least one stays on; at most {speechCatalog.maxActiveLanguages} can run at once.</span>
+                                <span>
+                                    {#if settings.dictationProvider === 'local'}
+                                        Parakeet auto-detects German, English, and 23 other European languages. Language chips still apply if you switch back to OpenAI or Apple.
+                                    {:else}
+                                        Filled chips are used for dictation. Outline chips stay downloaded but idle. At least one stays on; at most {speechCatalog.maxActiveLanguages} can run at once.
+                                    {/if}
+                                </span>
                             </div>
                             <div class="language-chips" role="group" aria-labelledby="dictate-languages-label">
                                 {#each settings.dictateDownloadedLanguages as code}
@@ -1127,7 +1242,7 @@
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <label for="dictateVocabulary">Dictionary words</label>
-                                <span>Recognition hints for OpenAI dictation. Apple Speech has no vocabulary API, so words still go into the cleanup prompt only.</span>
+                                <span>Recognition hints for OpenAI dictation. Apple Speech and Parakeet have no vocabulary API, so words still go into the cleanup prompt only.</span>
                             </div>
                             <div class="field-row">
                                 <input
@@ -1158,7 +1273,7 @@
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <div id="dictate-rules-label">Dictionary rules</div>
-                                <span>Heard → Write. OpenAI uses these as recognition hints from the start (transcription prompt plus keywords). After speech they are still replaced, including on Apple and when Don’t rewrite is on. Copy a corrected dictation once to be asked to add a rule.</span>
+                                <span>Heard → Write. OpenAI uses these as recognition hints from the start (transcription prompt plus keywords). After speech they are still replaced, including on Apple, Parakeet, and when Don’t rewrite is on. Copy a corrected dictation once to be asked to add a rule.</span>
                             </div>
                             <div class="dictionary-rule-row" role="group" aria-labelledby="dictate-rules-label">
                                 <input
@@ -1460,6 +1575,7 @@
                             <a href="https://github.com/LimTec-de/pasteAi/blob/master/LEGAL.md" class="app-button app-button--secondary" target="_blank">Legal</a>
                             <a href="https://www.limtec.de/#imprint" class="app-button app-button--ghost" target="_blank">Imprint</a>
                             <a href="https://openai.com/policies/terms-of-use" class="app-button app-button--ghost" target="_blank">OpenAI terms</a>
+                            <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3" class="app-button app-button--ghost" target="_blank">Parakeet (CC BY 4.0)</a>
                         </div>
                     </div>
                 </section>

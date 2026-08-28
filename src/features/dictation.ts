@@ -8,6 +8,7 @@ import { ProviderGateway } from '../domain/provider-gateway';
 import { PromptRepository } from '../domain/prompt-repository';
 import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
+import { getLocalSttStatus, preloadLocalStt } from '../domain/local-stt';
 import type { StatusType } from '../domain/types';
 import { transcriptionLanguages } from '../domain/types';
 import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords, transcriptionPrompt } from '../domain/dictate-dictionary';
@@ -41,10 +42,23 @@ export class DictationController {
             void this.handleCancel();
         });
         await this.registerFromSettings();
+        await this.preloadLocalIfNeeded();
     }
 
     async reregister(): Promise<void> {
         await this.registerFromSettings();
+        await this.preloadLocalIfNeeded();
+    }
+
+    private async preloadLocalIfNeeded(): Promise<void> {
+        const provider = await this.settingsRepository.get('dictationProvider');
+        if (provider !== 'local') {
+            return;
+        }
+
+        void preloadLocalStt().catch((error) => {
+            console.warn('Could not preload local speech model:', error);
+        });
     }
 
     private async registerFromSettings(): Promise<void> {
@@ -157,10 +171,14 @@ export class DictationController {
                 return;
             }
 
-            this.clipboardImprover.beginDictation();
-            await this.windows.hideStatus();
-            await invoke('remember_frontmost_app').catch((error) => {
-                console.warn('Could not remember frontmost app:', error);
+            await this.openOverlay({
+                engine: 'apple',
+                shortcut,
+                languages,
+                keywords,
+                transcriptionPrompt: transcriptionHint,
+                microphoneId,
+                outputMode
             });
 
             try {
@@ -170,32 +188,47 @@ export class DictationController {
                     return;
                 }
 
-                await this.windows.showDictate({
-                    engine: 'apple',
-                    shortcut,
-                    languages,
-                    keywords,
-                    transcriptionPrompt: transcriptionHint,
-                    microphoneId,
-                    outputMode
-                });
-                await invoke('restore_frontmost_app').catch((error) => {
-                    console.warn('Could not restore frontmost app:', error);
-                });
-
-                if (!this.holdIntent && !this.cancelled && !this.latched) {
-                    await this.windows.requestDictateFinish();
-                }
+                await this.windows.markDictateReady();
+                await this.finishIfReleased();
             } catch (error) {
-                console.error('Could not start dictation:', error);
+                await this.failStart(error, () => cancelAppleDictation().catch(() => undefined));
+            }
+            return;
+        }
+
+        if (settings.dictationProvider === 'local') {
+            const local = await getLocalSttStatus();
+            if (!local.installed) {
                 this.holdIntent = false;
                 this.latched = false;
-                this.clipboardImprover.endDictation();
-                await cancelAppleDictation().catch(() => undefined);
                 await this.showStatus(
-                    `Could not start dictation: ${error instanceof Error ? error.message : String(error)}`,
+                    local.message || 'Download the on-device speech model first',
                     'error'
                 );
+                await this.windows.openDashboard('providers');
+                return;
+            }
+
+            await this.openOverlay({
+                engine: 'local',
+                shortcut,
+                languages,
+                keywords,
+                transcriptionPrompt: transcriptionHint,
+                microphoneId,
+                outputMode
+            });
+
+            try {
+                await preloadLocalStt();
+                if (this.cancelled) {
+                    return;
+                }
+
+                await this.windows.markDictateReady();
+                await this.finishIfReleased();
+            } catch (error) {
+                await this.failStart(error);
             }
             return;
         }
@@ -209,10 +242,14 @@ export class DictationController {
             return;
         }
 
-        this.clipboardImprover.beginDictation();
-        await this.windows.hideStatus();
-        await invoke('remember_frontmost_app').catch((error) => {
-            console.warn('Could not remember frontmost app:', error);
+        await this.openOverlay({
+            engine: 'openai',
+            shortcut,
+            languages,
+            keywords,
+            transcriptionPrompt: transcriptionHint,
+            microphoneId,
+            outputMode
         });
 
         try {
@@ -221,33 +258,50 @@ export class DictationController {
                 return;
             }
 
-            await this.windows.showDictate({
-                engine: 'openai',
-                clientSecret,
-                shortcut,
-                languages,
-                keywords,
-                transcriptionPrompt: transcriptionHint,
-                microphoneId,
-                outputMode
-            });
-            await invoke('restore_frontmost_app').catch((error) => {
-                console.warn('Could not restore frontmost app:', error);
-            });
-
-            if (!this.holdIntent && !this.cancelled && !this.latched) {
-                await this.windows.requestDictateFinish();
-            }
+            await this.windows.provideDictateSession(clientSecret);
+            await this.finishIfReleased();
         } catch (error) {
-            console.error('Could not start dictation:', error);
-            this.holdIntent = false;
-            this.latched = false;
-            this.clipboardImprover.endDictation();
-            await this.showStatus(
-                `Could not start dictation: ${error instanceof Error ? error.message : String(error)}`,
-                'error'
-            );
+            await this.failStart(error);
         }
+    }
+
+    private async openOverlay(payload: {
+        engine: 'openai' | 'apple' | 'local';
+        shortcut: string;
+        languages: string[];
+        keywords: string[];
+        transcriptionPrompt: string;
+        microphoneId: string;
+        outputMode: 'insert' | 'clipboard';
+    }): Promise<void> {
+        this.clipboardImprover.beginDictation();
+        await this.windows.hideStatus();
+        await invoke('remember_frontmost_app').catch((error) => {
+            console.warn('Could not remember frontmost app:', error);
+        });
+        await this.windows.showDictate(payload);
+        await invoke('restore_frontmost_app').catch((error) => {
+            console.warn('Could not restore frontmost app:', error);
+        });
+    }
+
+    private async finishIfReleased(): Promise<void> {
+        if (!this.holdIntent && !this.cancelled && !this.latched) {
+            await this.windows.requestDictateFinish();
+        }
+    }
+
+    private async failStart(error: unknown, cleanup?: () => Promise<void>): Promise<void> {
+        console.error('Could not start dictation:', error);
+        this.holdIntent = false;
+        this.latched = false;
+        this.clipboardImprover.endDictation();
+        await cleanup?.();
+        await this.windows.hideDictate();
+        await this.showStatus(
+            `Could not start dictation: ${error instanceof Error ? error.message : String(error)}`,
+            'error'
+        );
     }
 
     private async handleCommit(payload: DictateCommitPayload): Promise<void> {

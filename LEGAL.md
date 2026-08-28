@@ -25,8 +25,9 @@ PasteAI collects and processes:
 - API keys (stored locally)
 
 ### Data Processing
-- Text is processed through OpenAI's API or local Ollama instance
-- Dictation audio is sent to OpenAI's Realtime transcription API when the user starts speech-to-clipboard
+- Text is processed through OpenAI's API, a local Ollama instance, or on-device Apple Intelligence
+- Dictation audio is sent to OpenAI's Realtime transcription API when OpenAI dictation is selected
+- On-device dictation (Apple Speech on Mac, or NVIDIA Parakeet via sherpa-onnx) keeps audio on this computer
 - No permanent storage of processed text
 - API keys are stored locally
 - Clipboard history is stored locally
@@ -76,6 +77,12 @@ You can manage or delete cookies through your browser settings. Disabling essent
 - Local processing option available through Ollama
 - No data sent to external services when using Ollama
 - Subject to [Ollama's License](https://github.com/ollama/ollama/blob/main/LICENSE)
+
+### NVIDIA Parakeet (local dictation)
+- Optional on-device speech-to-text model (Parakeet TDT 0.6B v3) downloaded by the user
+- Audio is processed locally via sherpa-onnx; it is not sent to NVIDIA
+- Model license: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Attribution: NVIDIA Parakeet TDT 0.6B v3, https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3
+- Runtime: [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) (Apache-2.0)
 
 ## Dependencies and Licenses
 PasteAI uses the following major components:

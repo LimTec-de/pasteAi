@@ -18,6 +18,8 @@ export const APP_EVENTS = {
     SETTINGS_CHANGED: 'settings:changed',
     PROMPTS_CHANGED: 'prompts:changed',
     DICTATE_OPEN: 'dictate:open',
+    DICTATE_SESSION: 'dictate:session',
+    DICTATE_READY: 'dictate:ready',
     DICTATE_HIDE: 'dictate:hide',
     DICTATE_LATCH: 'dictate:latch',
     DICTATE_FINISH: 'dictate:finish',
@@ -39,7 +41,7 @@ export interface AnswerDisplayPayload {
 }
 
 export interface DictateOpenPayload {
-    engine: 'openai' | 'apple';
+    engine: 'openai' | 'apple' | 'local';
     clientSecret?: string;
     shortcut: string;
     languages: string[];
@@ -47,6 +49,10 @@ export interface DictateOpenPayload {
     transcriptionPrompt: string;
     microphoneId: string;
     outputMode: DictateOutputMode;
+}
+
+export interface DictateSessionPayload {
+    clientSecret: string;
 }
 
 export interface StatusActionPayload {
@@ -70,6 +76,8 @@ export interface AppEventPayloads {
     [APP_EVENTS.SETTINGS_CHANGED]: undefined;
     [APP_EVENTS.PROMPTS_CHANGED]: undefined;
     [APP_EVENTS.DICTATE_OPEN]: DictateOpenPayload;
+    [APP_EVENTS.DICTATE_SESSION]: DictateSessionPayload;
+    [APP_EVENTS.DICTATE_READY]: undefined;
     [APP_EVENTS.DICTATE_HIDE]: undefined;
     [APP_EVENTS.DICTATE_LATCH]: undefined;
     [APP_EVENTS.DICTATE_FINISH]: undefined;

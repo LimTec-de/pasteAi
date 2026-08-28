@@ -22,3 +22,13 @@ commands.allow = [
     "apple_list_speech_languages",
     "apple_install_speech_language"
 ]
+
+[[permission]]
+identifier = "allow-local-stt"
+description = "On-device Parakeet speech recognition"
+commands.allow = [
+    "local_stt_status",
+    "local_stt_install",
+    "local_stt_preload",
+    "local_stt_transcribe"
+]

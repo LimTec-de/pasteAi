@@ -172,7 +172,7 @@ export class SettingsRepository {
                     ? value
                     : DEFAULT_SETTINGS.llmType) as AppSettings[K];
             case 'dictationProvider':
-                return (value === 'openai' || value === 'apple'
+                return (value === 'openai' || value === 'apple' || value === 'local'
                     ? value
                     : DEFAULT_SETTINGS.dictationProvider) as AppSettings[K];
             case 'dictateLanguages':

@@ -76,7 +76,42 @@ export class LiveTranscriptionSession {
 
     constructor(private readonly handlers: TranscriptionHandlers) {}
 
-    async start(clientSecret: string, options: { languages: string[]; keywords?: string[]; prompt?: string; microphoneId?: string }): Promise<void> {
+    private pendingPcm: Float32Array[] = [];
+    private connected = false;
+    private connectWaiters: Array<(error?: Error) => void> = [];
+    private connectError: Error | null = null;
+
+    isConnected(): boolean {
+        return this.connected && this.socket?.readyState === WebSocket.OPEN;
+    }
+
+    async waitUntilConnected(timeoutMs = COMMIT_TIMEOUT_MS): Promise<void> {
+        if (this.isConnected()) {
+            return;
+        }
+
+        if (this.connectError) {
+            throw this.connectError;
+        }
+
+        await new Promise<void>((resolve, reject) => {
+            const timer = window.setTimeout(() => {
+                reject(new Error('Transcription connection timed out'));
+            }, timeoutMs);
+
+            this.connectWaiters.push((error) => {
+                window.clearTimeout(timer);
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve();
+            });
+        });
+    }
+
+    async startMic(options: { microphoneId?: string }): Promise<void> {
         const audio: MediaTrackConstraints = {
             echoCancellation: true,
             noiseSuppression: true,
@@ -87,7 +122,14 @@ export class LiveTranscriptionSession {
         }
 
         this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+        await this.startMicPipeline();
+    }
 
+    async connect(
+        clientSecret: string,
+        options: { languages: string[]; keywords?: string[]; prompt?: string }
+    ): Promise<void> {
+        this.connectError = null;
         this.socket = new WebSocket('wss://api.openai.com/v1/realtime?intent=transcription', [
             'realtime',
             `openai-insecure-api-key.${clientSecret}`
@@ -104,6 +146,9 @@ export class LiveTranscriptionSession {
                 options.prompt
             )));
             this.ready = true;
+            this.connected = true;
+            this.flushPendingPcm();
+            this.settleConnect();
         });
 
         this.socket.addEventListener('message', (event) => {
@@ -115,16 +160,22 @@ export class LiveTranscriptionSession {
         });
 
         this.socket.addEventListener('error', () => {
+            this.settleConnect(new Error('Transcription connection failed'));
             this.settleCommit(new Error('Transcription connection failed'));
             this.handlers.onError('Transcription connection failed');
         });
 
         this.socket.addEventListener('close', () => {
             this.ready = false;
+            this.connected = false;
+            this.settleConnect(new Error('Transcription connection closed'));
             this.settleCommit(new Error('Transcription connection closed'));
         });
+    }
 
-        await this.startMicPipeline();
+    async start(clientSecret: string, options: { languages: string[]; keywords?: string[]; prompt?: string; microphoneId?: string }): Promise<void> {
+        await this.startMic({ microphoneId: options.microphoneId });
+        await this.connect(clientSecret, options);
     }
 
     async commitAndWait(timeoutMs = COMMIT_TIMEOUT_MS): Promise<void> {
@@ -162,6 +213,8 @@ export class LiveTranscriptionSession {
     stop(): void {
         this.closed = true;
         this.ready = false;
+        this.connected = false;
+        this.settleConnect(new Error('Transcription stopped'));
         this.settleCommit(new Error('Transcription stopped'));
 
         if (this.levelFrame !== 0) {
@@ -216,12 +269,18 @@ export class LiveTranscriptionSession {
         const worklet = new AudioWorkletNode(audioContext, 'pcm-processor');
 
         worklet.port.onmessage = (event) => {
-            if (this.closed || !this.ready) {
+            if (this.closed) {
                 return;
             }
 
             const input = event.data as Float32Array;
-            this.enqueuePcm(resample(input, audioContext.sampleRate, TARGET_SAMPLE_RATE));
+            const resampled = resample(input, audioContext.sampleRate, TARGET_SAMPLE_RATE);
+            if (!this.ready) {
+                this.pendingPcm.push(resampled);
+                return;
+            }
+
+            this.enqueuePcm(resampled);
         };
 
         const mute = audioContext.createGain();
@@ -262,6 +321,25 @@ export class LiveTranscriptionSession {
 
         this.sendPcm(this.pcmRemainder);
         this.pcmRemainder = new Float32Array(0);
+    }
+
+    private flushPendingPcm(): void {
+        const pending = this.pendingPcm;
+        this.pendingPcm = [];
+        for (const chunk of pending) {
+            this.enqueuePcm(chunk);
+        }
+    }
+
+    private settleConnect(error?: Error): void {
+        if (error) {
+            this.connectError = error;
+        }
+        const waiters = this.connectWaiters;
+        this.connectWaiters = [];
+        for (const waiter of waiters) {
+            waiter(error);
+        }
     }
 
     private settleCommit(error?: Error): void {
@@ -333,6 +411,128 @@ export class LiveTranscriptionSession {
     }
 }
 
+export class MicrophoneCapture {
+    private stream: MediaStream | null = null;
+    private audioContext: AudioContext | null = null;
+    private workletNode: AudioWorkletNode | null = null;
+    private sourceNode: MediaStreamAudioSourceNode | null = null;
+    private analyser: AnalyserNode | null = null;
+    private levelFrame = 0;
+    private closed = false;
+    private chunks: Float32Array[] = [];
+    private sampleRate = 48000;
+
+    constructor(private readonly onLevel: (level: number) => void) {}
+
+    async start(microphoneId?: string): Promise<void> {
+        const audio: MediaTrackConstraints = {
+            echoCancellation: true,
+            noiseSuppression: true,
+            channelCount: 1
+        };
+        if (microphoneId) {
+            audio.deviceId = { exact: microphoneId };
+        }
+
+        this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+        const audioContext = new AudioContext();
+        this.audioContext = audioContext;
+        this.sampleRate = audioContext.sampleRate;
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+
+        const blob = new Blob([WORKLET_SOURCE], { type: 'application/javascript' });
+        const workletUrl = URL.createObjectURL(blob);
+        try {
+            await audioContext.audioWorklet.addModule(workletUrl);
+        } finally {
+            URL.revokeObjectURL(workletUrl);
+        }
+
+        const source = audioContext.createMediaStreamSource(this.stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        const worklet = new AudioWorkletNode(audioContext, 'pcm-processor');
+        worklet.port.onmessage = (event) => {
+            if (this.closed) {
+                return;
+            }
+
+            this.chunks.push(event.data as Float32Array);
+        };
+
+        const mute = audioContext.createGain();
+        mute.gain.value = 0;
+        source.connect(analyser);
+        source.connect(worklet);
+        worklet.connect(mute);
+        mute.connect(audioContext.destination);
+        this.sourceNode = source;
+        this.analyser = analyser;
+        this.workletNode = worklet;
+        this.pumpLevel();
+    }
+
+    takePcm16(): { pcm: Uint8Array; sampleRate: number } {
+        let total = 0;
+        for (const chunk of this.chunks) {
+            total += chunk.length;
+        }
+
+        const merged = new Float32Array(total);
+        let offset = 0;
+        for (const chunk of this.chunks) {
+            merged.set(chunk, offset);
+            offset += chunk.length;
+        }
+
+        return {
+            pcm: floatToPcm16Le(merged),
+            sampleRate: this.sampleRate
+        };
+    }
+
+    stop(): void {
+        this.closed = true;
+        if (this.levelFrame !== 0) {
+            cancelAnimationFrame(this.levelFrame);
+            this.levelFrame = 0;
+        }
+
+        this.workletNode?.port.close();
+        this.workletNode?.disconnect();
+        this.sourceNode?.disconnect();
+        this.analyser?.disconnect();
+        this.workletNode = null;
+        this.sourceNode = null;
+        this.analyser = null;
+        this.stream?.getTracks().forEach((track) => track.stop());
+        this.stream = null;
+        if (this.audioContext) {
+            void this.audioContext.close();
+            this.audioContext = null;
+        }
+    }
+
+    private pumpLevel(): void {
+        const analyser = this.analyser;
+        if (!analyser || this.closed) {
+            return;
+        }
+
+        const data = new Uint8Array(analyser.fftSize);
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (const sample of data) {
+            const centered = (sample - 128) / 128;
+            sum += centered * centered;
+        }
+        this.onLevel(Math.min(1, Math.sqrt(sum / data.length) * 4));
+        this.levelFrame = requestAnimationFrame(() => this.pumpLevel());
+    }
+}
+
 function resample(input: Float32Array, fromRate: number, toRate: number): Float32Array {
     if (fromRate === toRate) {
         return input;
@@ -370,4 +570,15 @@ function floatToBase64Pcm16(samples: Float32Array): string {
     }
 
     return btoa(binary);
+}
+
+function floatToPcm16Le(samples: Float32Array): Uint8Array {
+    const bytes = new Uint8Array(samples.length * 2);
+    const view = new DataView(bytes.buffer);
+    for (let index = 0; index < samples.length; index += 1) {
+        const clipped = Math.max(-1, Math.min(1, samples[index] ?? 0));
+        view.setInt16(index * 2, clipped < 0 ? clipped * 0x8000 : clipped * 0x7fff, true);
+    }
+
+    return bytes;
 }

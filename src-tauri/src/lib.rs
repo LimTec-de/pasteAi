@@ -1,5 +1,6 @@
 mod apple;
 mod frontmost;
+mod local_stt;
 
 use std::process::exit;
 use tauri_plugin_autostart::MacosLauncher;
@@ -10,6 +11,7 @@ use tauri_plugin_store::StoreExt;
 pub fn run() {
     tauri::Builder::default()
         .manage(frontmost::PreviousApp::default())
+        .manage(local_stt::LocalSttState::default())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -57,7 +59,11 @@ pub fn run() {
             apple::apple_dictation_cancel,
             apple::apple_list_input_devices,
             apple::apple_list_speech_languages,
-            apple::apple_install_speech_language
+            apple::apple_install_speech_language,
+            local_stt::local_stt_status,
+            local_stt::local_stt_install,
+            local_stt::local_stt_preload,
+            local_stt::local_stt_transcribe
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

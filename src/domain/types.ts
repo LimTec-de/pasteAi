@@ -1,6 +1,6 @@
 export type ProviderId = 'pasteai' | 'openai' | 'ollama' | 'apple';
 
-export type DictationProviderId = 'openai' | 'apple';
+export type DictationProviderId = 'openai' | 'apple' | 'local';
 
 export type DictateOutputMode = 'insert' | 'clipboard';
 
