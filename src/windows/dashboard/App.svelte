@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { emitTo } from '@tauri-apps/api/event';
+    import { emitTo, listen } from '@tauri-apps/api/event';
     import { getVersion } from '@tauri-apps/api/app';
     import { Window } from '@tauri-apps/api/window';
     import clipboard from 'tauri-plugin-clipboard-api';
@@ -72,6 +72,9 @@
     let languageMessage = '';
     let installingLanguage: string | null = null;
     let speechAssetPoll: ReturnType<typeof setInterval> | null = null;
+    let vocabularyDraft = '';
+    let ruleFromDraft = '';
+    let ruleToDraft = '';
 
     let version = 'Loading version...';
     let welcomeSectionElement: HTMLElement | null = null;
@@ -466,6 +469,63 @@
         await updateSettings({ dictatePromptId: DEFAULT_DICTATE_PROMPT_ID });
     }
 
+    async function addVocabularyWord(): Promise<void> {
+        const word = vocabularyDraft.trim();
+        if (word.length === 0) {
+            return;
+        }
+
+        vocabularyDraft = '';
+        await updateSettings({
+            dictateVocabulary: [...settings.dictateVocabulary, word]
+        });
+    }
+
+    async function removeVocabularyWord(word: string): Promise<void> {
+        await updateSettings({
+            dictateVocabulary: settings.dictateVocabulary.filter((entry) => entry !== word)
+        });
+    }
+
+    async function addDictionaryRule(): Promise<void> {
+        const from = ruleFromDraft.trim();
+        const to = ruleToDraft.trim();
+        if (from.length === 0 || to.length === 0) {
+            return;
+        }
+
+        ruleFromDraft = '';
+        ruleToDraft = '';
+        const fromKey = from.toLowerCase();
+        const nextRules = settings.dictateReplacements.filter((entry) => entry.from.toLowerCase() !== fromKey);
+        await updateSettings({
+            dictateReplacements: [
+                ...nextRules,
+                { id: crypto.randomUUID(), from, to }
+            ]
+        });
+    }
+
+    async function removeDictionaryRule(id: string): Promise<void> {
+        await updateSettings({
+            dictateReplacements: settings.dictateReplacements.filter((entry) => entry.id !== id)
+        });
+    }
+
+    function handleVocabularyKeydown(event: KeyboardEvent): void {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            void addVocabularyWord();
+        }
+    }
+
+    function handleRuleKeydown(event: KeyboardEvent): void {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            void addDictionaryRule();
+        }
+    }
+
     async function refreshMicrophones(): Promise<void> {
         microphoneMessage = '';
         try {
@@ -623,12 +683,17 @@
         let unlistenOpen: (() => void) | undefined;
         let unlistenCloseRequested: (() => void) | undefined;
         let unlistenFocus: (() => void) | undefined;
+        let unlistenSettings: (() => void) | undefined;
 
         void (async () => {
             const currentWindow = Window.getCurrent();
 
             unlistenOpen = await currentWindow.listen<DashboardOpenPayload>(APP_EVENTS.DASHBOARD_OPEN, (event) => {
                 setActiveSection(event.payload.section);
+            });
+            unlistenSettings = await listen(APP_EVENTS.SETTINGS_CHANGED, async () => {
+                await settingsRepository.reload();
+                settings = await settingsRepository.getAll();
             });
             unlistenCloseRequested = await currentWindow.onCloseRequested(async (event) => {
                 event.preventDefault();
@@ -662,6 +727,7 @@
             unlistenOpen?.();
             unlistenCloseRequested?.();
             unlistenFocus?.();
+            unlistenSettings?.();
             window.removeEventListener('keydown', handleShortcutKeydown, true);
             navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
             stopSpeechAssetPoll();
@@ -1056,6 +1122,72 @@
                                     <option value={String(prompt.id)}>{prompt.title}</option>
                                 {/each}
                             </select>
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="dictateVocabulary">Dictionary words</label>
+                                <span>Recognition hints for OpenAI dictation. Apple Speech has no vocabulary API, so words still go into the cleanup prompt only.</span>
+                            </div>
+                            <div class="field-row">
+                                <input
+                                    id="dictateVocabulary"
+                                    type="text"
+                                    placeholder="Acme GmbH, useState, pasteAI"
+                                    bind:value={vocabularyDraft}
+                                    on:keydown={handleVocabularyKeydown}
+                                >
+                                <button class="app-button app-button--secondary" type="button" on:click={() => void addVocabularyWord()}>Add</button>
+                            </div>
+                            {#if settings.dictateVocabulary.length > 0}
+                                <div class="language-chips">
+                                    {#each settings.dictateVocabulary as word}
+                                        <button
+                                            class="language-chip is-active"
+                                            type="button"
+                                            title={`Remove ${word}`}
+                                            on:click={() => void removeVocabularyWord(word)}
+                                        >
+                                            {word} ×
+                                        </button>
+                                    {/each}
+                                </div>
+                            {/if}
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <div id="dictate-rules-label">Dictionary rules</div>
+                                <span>If the transcript contains the left phrase, replace it with the right. Applied after rewrite, even when Don’t rewrite is on. Copy a corrected dictation once to be asked to add a rule.</span>
+                            </div>
+                            <div class="dictionary-rule-row" role="group" aria-labelledby="dictate-rules-label">
+                                <input
+                                    type="text"
+                                    placeholder="Heard, e.g. meine E-Mail"
+                                    bind:value={ruleFromDraft}
+                                    on:keydown={handleRuleKeydown}
+                                >
+                                <span class="dictionary-rule-arrow" aria-hidden="true">→</span>
+                                <input
+                                    type="text"
+                                    placeholder="Write, e.g. you@company.com"
+                                    bind:value={ruleToDraft}
+                                    on:keydown={handleRuleKeydown}
+                                >
+                                <button class="app-button app-button--secondary" type="button" on:click={() => void addDictionaryRule()}>Add</button>
+                            </div>
+                            {#if settings.dictateReplacements.length > 0}
+                                <ul class="dictionary-rule-list">
+                                    {#each settings.dictateReplacements as rule}
+                                        <li>
+                                            <span>{rule.from}</span>
+                                            <span class="dictionary-rule-arrow" aria-hidden="true">→</span>
+                                            <strong>{rule.to}</strong>
+                                            <button type="button" class="dictionary-rule-remove" title="Remove rule" on:click={() => void removeDictionaryRule(rule.id)}>×</button>
+                                        </li>
+                                    {/each}
+                                </ul>
+                            {/if}
                         </section>
                     </div>
                 </section>

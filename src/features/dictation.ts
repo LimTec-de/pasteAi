@@ -10,6 +10,7 @@ import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import type { StatusType } from '../domain/types';
 import { transcriptionLanguages } from '../domain/types';
+import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords } from '../domain/dictate-dictionary';
 import { AppWindows } from '../platform/windows';
 import { ClipboardImprover } from './clipboard-improver';
 
@@ -141,6 +142,7 @@ export class DictationController {
         const settings = await this.settingsRepository.getAll();
         const shortcut = settings.dictateShortcut.trim() || CONFIG.DEFAULT_DICTATE_SHORTCUT;
         const languages = transcriptionLanguages(settings);
+        const keywords = transcriptionKeywords(settings.dictateVocabulary);
         const microphoneId = settings.dictateMicrophoneId.trim();
         const outputMode = settings.dictateOutputMode;
 
@@ -171,6 +173,7 @@ export class DictationController {
                     engine: 'apple',
                     shortcut,
                     languages,
+                    keywords,
                     microphoneId,
                     outputMode
                 });
@@ -221,6 +224,7 @@ export class DictationController {
                 clientSecret,
                 shortcut,
                 languages,
+                keywords,
                 microphoneId,
                 outputMode
             });
@@ -270,11 +274,14 @@ export class DictationController {
         }
 
         let text = transcript;
+        const settings = await this.settingsRepository.getAll();
         const prompt = await this.promptRepository.getDictatePrompt();
         if (prompt) {
             try {
                 await this.showStatus('Improving...', 'working', { autohide: false });
-                text = await this.providerGateway.improve(transcript, prompt.prompt);
+                const suffix = dictionaryPromptSuffix(settings.dictateVocabulary, settings.dictateReplacements);
+                const systemPrompt = suffix.length > 0 ? `${prompt.prompt}\n\n${suffix}` : prompt.prompt;
+                text = await this.providerGateway.improve(transcript, systemPrompt);
             } catch (error) {
                 console.error('Could not improve dictation:', error);
                 this.clipboardImprover.endDictation();
@@ -299,10 +306,13 @@ export class DictationController {
             }
         }
 
+        text = applyReplacements(text, settings.dictateReplacements);
+
         this.clipboardImprover.suppressNextWrite(text);
         await clipboard.writeText(text);
+        this.clipboardImprover.armDictionaryLearn(text);
 
-        const outputMode = await this.settingsRepository.get('dictateOutputMode');
+        const outputMode = settings.dictateOutputMode;
         if (outputMode === 'clipboard') {
             await invoke('restore_frontmost_app').catch((error) => {
                 console.warn('Could not restore frontmost app:', error);

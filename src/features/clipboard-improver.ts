@@ -1,14 +1,24 @@
+import { emit, listen } from '@tauri-apps/api/event';
 import clipboard, { getAvailableTypes, onTextUpdate, readHtml, startListening } from 'tauri-plugin-clipboard-api';
 // Diagnostics logging (disabled). Re-add `readRtf` above and uncomment the import
 // below together with logClipboardDiagnostics to re-enable raw clipboard logging.
 // import { info } from '@tauri-apps/plugin-log';
+import { APP_EVENTS, type StatusActionPayload } from '../app/events';
 import { CONFIG } from '../config';
 import { htmlToImprovableText } from '../domain/clipboard-html';
+import {
+    inspectCopiedDictation,
+    isSpeakableTerm,
+    normalizeReplacements,
+    normalizeVocabulary
+} from '../domain/dictate-dictionary';
 import { PromptRepository } from '../domain/prompt-repository';
 import { ProviderGateway } from '../domain/provider-gateway';
 import { SettingsRepository } from '../domain/settings-repository';
-import type { PromptOption, StatusType } from '../domain/types';
+import type { DictionaryLearnPair, PromptOption, StatusType } from '../domain/types';
 import { AppWindows } from '../platform/windows';
+
+const LEARN_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface ImproveInput {
     text: string;
@@ -37,6 +47,8 @@ export class ClipboardImprover {
         suppressedClipboardText: null,
         cooldownTimeout: null
     };
+    private learn: { text: string; at: number } | null = null;
+    private pendingLearn: DictionaryLearnPair[] | null = null;
 
     constructor(
         private readonly promptRepository: PromptRepository,
@@ -46,6 +58,10 @@ export class ClipboardImprover {
     ) { }
 
     async start(): Promise<void> {
+        await listen<StatusActionPayload>(APP_EVENTS.STATUS_ACTION, (event) => {
+            void this.handleStatusAction(event.payload.action);
+        });
+
         await onTextUpdate(async (text) => {
             await this.handleClipboardUpdate(text);
         });
@@ -58,6 +74,8 @@ export class ClipboardImprover {
     }
 
     beginDictation(): void {
+        this.learn = null;
+        this.pendingLearn = null;
         this.state.runState = 'dictating';
     }
 
@@ -67,6 +85,11 @@ export class ClipboardImprover {
 
     suppressNextWrite(text: string): void {
         this.state.suppressedClipboardText = text;
+    }
+
+    armDictionaryLearn(text: string): void {
+        this.learn = { text, at: Date.now() };
+        this.pendingLearn = null;
     }
 
     enterWriteCooldown(): void {
@@ -84,6 +107,10 @@ export class ClipboardImprover {
         }
 
         if (this.state.runState !== 'idle') {
+            return;
+        }
+
+        if (await this.maybeLearnFromCopy(newText)) {
             return;
         }
 
@@ -338,6 +365,77 @@ export class ClipboardImprover {
             window.clearTimeout(this.state.cooldownTimeout);
             this.state.cooldownTimeout = null;
         }
+    }
+
+    private async maybeLearnFromCopy(copied: string): Promise<boolean> {
+        if (!this.learn) {
+            return false;
+        }
+
+        if (Date.now() - this.learn.at > LEARN_TIMEOUT_MS) {
+            this.learn = null;
+            return false;
+        }
+
+        const settings = await this.settingsRepository.getAll();
+        const inspection = inspectCopiedDictation(this.learn.text, copied, {
+            vocabulary: settings.dictateVocabulary,
+            replacements: settings.dictateReplacements
+        });
+        if (!inspection.similar) {
+            return false;
+        }
+
+        this.learn = null;
+        if (inspection.pairs.length === 0) {
+            return true;
+        }
+
+        this.pendingLearn = inspection.pairs;
+        await this.windows.showStatus({
+            message: 'Add these dictionary rules?',
+            type: 'info',
+            autohide: true,
+            pairs: inspection.pairs,
+            actions: [
+                { id: 'add', label: 'Add' },
+                { id: 'skip', label: 'Skip' }
+            ]
+        });
+        return true;
+    }
+
+    private async handleStatusAction(action: 'add' | 'skip'): Promise<void> {
+        const pairs = this.pendingLearn;
+        this.pendingLearn = null;
+        await this.windows.hideStatus();
+
+        if (action !== 'add' || !pairs || pairs.length === 0) {
+            return;
+        }
+
+        const settings = await this.settingsRepository.getAll();
+        const replacements = [...settings.dictateReplacements];
+        const vocabulary = [...settings.dictateVocabulary];
+        const seenFrom = new Set(replacements.map((entry) => entry.from.toLowerCase()));
+
+        for (const pair of pairs) {
+            if (!seenFrom.has(pair.from.toLowerCase())) {
+                seenFrom.add(pair.from.toLowerCase());
+                replacements.push({ id: crypto.randomUUID(), from: pair.from, to: pair.to });
+            }
+
+            if (isSpeakableTerm(pair.to) && !vocabulary.includes(pair.to)) {
+                vocabulary.push(pair.to);
+            }
+        }
+
+        await this.settingsRepository.update({
+            dictateReplacements: normalizeReplacements(replacements),
+            dictateVocabulary: normalizeVocabulary(vocabulary)
+        });
+        await emit(APP_EVENTS.SETTINGS_CHANGED);
+        await this.showStatus('Dictionary updated', 'ok');
     }
 
     private async showStatus(message: string, type: StatusType, options: { autohide?: boolean; allowHtml?: boolean } = {}): Promise<void> {

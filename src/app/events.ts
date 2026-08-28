@@ -22,7 +22,8 @@ export const APP_EVENTS = {
     DICTATE_LATCH: 'dictate:latch',
     DICTATE_FINISH: 'dictate:finish',
     DICTATE_COMMIT: 'dictate:commit',
-    DICTATE_CANCEL: 'dictate:cancel'
+    DICTATE_CANCEL: 'dictate:cancel',
+    STATUS_ACTION: 'status:action'
 } as const;
 
 export interface WindowReadyPayload {
@@ -42,8 +43,13 @@ export interface DictateOpenPayload {
     clientSecret?: string;
     shortcut: string;
     languages: string[];
+    keywords: string[];
     microphoneId: string;
     outputMode: DictateOutputMode;
+}
+
+export interface StatusActionPayload {
+    action: 'add' | 'skip';
 }
 
 export interface DictateCommitPayload {
@@ -68,4 +74,5 @@ export interface AppEventPayloads {
     [APP_EVENTS.DICTATE_FINISH]: undefined;
     [APP_EVENTS.DICTATE_COMMIT]: DictateCommitPayload;
     [APP_EVENTS.DICTATE_CANCEL]: undefined;
+    [APP_EVENTS.STATUS_ACTION]: StatusActionPayload;
 }

@@ -22,10 +22,18 @@
     };
     let isVisible = false;
     let hideTimeout: number | null = null;
+    let actionSent = false;
 
     $: statusCopy = STATUS_COPY[currentPayload.type];
+    $: hasActions = (currentPayload.actions?.length ?? 0) > 0;
 
     async function display(payload: StatusDisplayPayload): Promise<void> {
+        const payloadHasActions = (payload.actions?.length ?? 0) > 0;
+        if (isVisible && hasActions && !actionSent) {
+            await sendAction('skip');
+        }
+
+        actionSent = false;
         currentPayload = {
             autohide: true,
             allowHtml: false,
@@ -41,12 +49,35 @@
         }
 
         if (currentPayload.autohide) {
+            const delay = payloadHasActions ? 20000 : (currentPayload.type === 'error' ? 10000 : 1200);
             hideTimeout = window.setTimeout(async () => {
+                if (payloadHasActions && !actionSent) {
+                    await sendAction('skip');
+                }
                 await hide();
-            }, currentPayload.type === 'error' ? 10000 : 1200);
+            }, delay);
         } else {
             hideTimeout = null;
         }
+    }
+
+    async function sendAction(action: 'add' | 'skip'): Promise<void> {
+        if (actionSent) {
+            return;
+        }
+
+        actionSent = true;
+        await emitTo('main', APP_EVENTS.STATUS_ACTION, { action });
+    }
+
+    async function handleAction(action: 'add' | 'skip'): Promise<void> {
+        if (hideTimeout !== null) {
+            window.clearTimeout(hideTimeout);
+            hideTimeout = null;
+        }
+
+        await sendAction(action);
+        await hide();
     }
 
     async function hide(): Promise<void> {
@@ -60,11 +91,12 @@
         }
 
         const rect = toastElement.getBoundingClientRect();
+        const maxHeight = hasActions ? 360 : 204;
         const statusWindow = Window.getCurrent();
         await statusWindow.setSize(
             new LogicalSize(
                 Math.min(Math.max(rect.width + 26, 344), 544),
-                Math.min(Math.max(rect.height + 26, 96), 204)
+                Math.min(Math.max(rect.height + 26, 96), maxHeight)
             )
         );
         await centerWindowOnCursorMonitor(statusWindow);
@@ -109,5 +141,25 @@
                 {currentPayload.message}
             {/if}
         </div>
+        {#if currentPayload.pairs && currentPayload.pairs.length > 0}
+            <ul class="status-toast__pairs">
+                {#each currentPayload.pairs as pair}
+                    <li><span>{pair.from}</span> → <strong>{pair.to}</strong></li>
+                {/each}
+            </ul>
+        {/if}
+        {#if currentPayload.actions && currentPayload.actions.length > 0}
+            <div class="status-toast__actions">
+                {#each currentPayload.actions as action}
+                    <button
+                        type="button"
+                        class={action.id === 'add' ? 'status-toast__action status-toast__action--primary' : 'status-toast__action'}
+                        on:click={() => void handleAction(action.id)}
+                    >
+                        {action.label}
+                    </button>
+                {/each}
+            </div>
+        {/if}
     </div>
 </div>

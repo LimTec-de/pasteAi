@@ -34,6 +34,19 @@ export interface AppSettings {
     dictateMicrophoneId: string;
     dictateOutputMode: DictateOutputMode;
     dictatePromptId: number | null;
+    dictateVocabulary: string[];
+    dictateReplacements: DictateReplacement[];
+}
+
+export interface DictateReplacement {
+    id: string;
+    from: string;
+    to: string;
+}
+
+export interface DictionaryLearnPair {
+    from: string;
+    to: string;
 }
 
 export function isLanguageCode(value: string): boolean {
@@ -112,11 +125,18 @@ export interface PromptOption {
 
 export type StatusType = 'error' | 'ok' | 'working' | 'info';
 
+export interface StatusAction {
+    id: 'add' | 'skip';
+    label: string;
+}
+
 export interface StatusDisplayPayload {
     message: string;
     type: StatusType;
     autohide?: boolean;
     allowHtml?: boolean;
+    pairs?: DictionaryLearnPair[];
+    actions?: StatusAction[];
 }
 
 export interface PasteAIQuota {

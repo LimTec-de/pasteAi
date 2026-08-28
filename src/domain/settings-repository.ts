@@ -1,5 +1,6 @@
 import { AppStore } from './store';
 import { CONFIG } from '../config';
+import { normalizeReplacements, normalizeVocabulary } from './dictate-dictionary';
 import {
     DEFAULT_DICTATE_LANGUAGES,
     DEFAULT_DICTATE_PROMPT_ID,
@@ -24,7 +25,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dictateDownloadedLanguages: [...DEFAULT_DICTATE_LANGUAGES],
     dictateMicrophoneId: '',
     dictateOutputMode: 'insert',
-    dictatePromptId: DEFAULT_DICTATE_PROMPT_ID
+    dictatePromptId: DEFAULT_DICTATE_PROMPT_ID,
+    dictateVocabulary: [],
+    dictateReplacements: []
 };
 
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
@@ -43,7 +46,9 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     dictateDownloadedLanguages: 'dictateDownloadedLanguages',
     dictateMicrophoneId: 'dictateMicrophoneId',
     dictateOutputMode: 'dictateOutputMode',
-    dictatePromptId: 'dictatePromptId'
+    dictatePromptId: 'dictatePromptId',
+    dictateVocabulary: 'dictateVocabulary',
+    dictateReplacements: 'dictateReplacements'
 };
 
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
@@ -178,6 +183,10 @@ export class SettingsRepository {
                 return (value === 'insert' || value === 'clipboard'
                     ? value
                     : DEFAULT_SETTINGS.dictateOutputMode) as AppSettings[K];
+            case 'dictateVocabulary':
+                return normalizeVocabulary(value) as AppSettings[K];
+            case 'dictateReplacements':
+                return normalizeReplacements(value) as AppSettings[K];
             case 'dictatePromptId':
                 if (typeof value === 'number' && Number.isFinite(value)) {
                     return value as AppSettings[K];

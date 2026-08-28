@@ -100,6 +100,7 @@
         try {
             await nextSession.start(clientSecret, {
                 languages: payload.languages,
+                keywords: payload.keywords,
                 microphoneId: payload.microphoneId || undefined
             });
             if (session === nextSession) {

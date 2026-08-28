@@ -402,6 +402,62 @@
     font-weight: 600;
 }
 
+.dictionary-rule-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    align-items: center;
+}
+
+.dictionary-rule-arrow {
+    color: var(--color-muted);
+    font-weight: 700;
+}
+
+.dictionary-rule-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.35rem;
+}
+
+.dictionary-rule-list li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    gap: 0.45rem;
+    align-items: center;
+    padding: 0.4rem 0.55rem;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-raised);
+    font-size: 0.88rem;
+}
+
+.dictionary-rule-list li span,
+.dictionary-rule-list li strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dictionary-rule-remove {
+    width: 1.7rem;
+    height: 1.7rem;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--color-muted);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.dictionary-rule-remove:hover {
+    color: var(--color-text);
+    background: rgba(113, 113, 122, 0.12);
+}
+
 .detail-empty {
     display: grid;
     place-items: center;

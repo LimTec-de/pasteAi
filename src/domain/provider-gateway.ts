@@ -4,6 +4,7 @@ import { CONFIG } from '../config';
 import { SettingsRepository } from './settings-repository';
 import type { AppSettings, PasteAIQuota } from './types';
 import { transcriptionLanguages } from './types';
+import { transcriptionKeywords } from './dictate-dictionary';
 import { improveWithApple } from './apple-system';
 
 interface PasteAIErrorResponse {
@@ -176,6 +177,7 @@ export class ProviderGateway {
             throw new Error('OpenAI API key missing');
         }
 
+        const keywords = transcriptionKeywords(settings.dictateVocabulary);
         const response = await tauriFetch('https://api.openai.com/v1/realtime/client_secrets', {
             method: 'POST',
             headers: {
@@ -194,7 +196,8 @@ export class ProviderGateway {
                             transcription: {
                                 model: 'gpt-transcribe',
                                 prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
-                                languages: transcriptionLanguages(settings)
+                                languages: transcriptionLanguages(settings),
+                                ...(keywords.length > 0 ? { keywords } : {})
                             },
                             turn_detection: null
                         }
