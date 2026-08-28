@@ -2,13 +2,18 @@ export type ProviderId = 'pasteai' | 'openai' | 'ollama' | 'apple';
 
 export type DictationProviderId = 'openai' | 'apple';
 
-export type DictateLanguage = 'auto' | 'de' | 'en';
-
 export type DictateOutputMode = 'insert' | 'clipboard';
 
 export type ManagedWindowId = 'dashboard' | 'prompt' | 'status' | 'answer' | 'dictate';
 
 export type DashboardSection = 'welcome' | 'providers' | 'dictation' | 'prompts' | 'shell' | 'about';
+
+export const DEFAULT_DICTATE_LANGUAGES = ['de', 'en'];
+
+export const FALLBACK_SPEECH_LANGUAGE_CODES = [
+    'ar', 'da', 'de', 'en', 'es', 'fi', 'fr', 'he', 'it', 'ja', 'ko',
+    'ms', 'nb', 'nl', 'pt', 'ru', 'sv', 'th', 'tr', 'vi', 'yue', 'zh'
+];
 
 export interface AppSettings {
     llmType: ProviderId;
@@ -22,13 +27,74 @@ export interface AppSettings {
     improveHtml: boolean;
     dictateShortcut: string;
     dictationProvider: DictationProviderId;
-    dictateLanguage: DictateLanguage;
+    dictateLanguages: string[];
+    dictateDownloadedLanguages: string[];
     dictateMicrophoneId: string;
     dictateOutputMode: DictateOutputMode;
 }
 
-export function transcriptionLanguages(language: DictateLanguage): string[] {
-    return language === 'auto' ? ['de', 'en'] : [language];
+export function isLanguageCode(value: string): boolean {
+    return /^[a-z]{2,3}$/.test(value);
+}
+
+export function uniqueLanguageCodes(codes: string[]): string[] {
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const code of codes) {
+        if (!isLanguageCode(code) || seen.has(code)) {
+            continue;
+        }
+        seen.add(code);
+        unique.push(code);
+    }
+    return unique;
+}
+
+export function normalizeLanguageList(value: unknown, fallback: string[] = DEFAULT_DICTATE_LANGUAGES): string[] {
+    if (typeof value === 'string') {
+        if (value === 'auto') {
+            return [...fallback];
+        }
+        return uniqueLanguageCodes(value.split(/[,\s]+/));
+    }
+
+    if (Array.isArray(value)) {
+        return uniqueLanguageCodes(value.filter((item): item is string => typeof item === 'string'));
+    }
+
+    return [];
+}
+
+export interface SpeechLanguage {
+    code: string;
+    label: string;
+}
+
+export interface SpeechLanguageCatalog {
+    languages: SpeechLanguage[];
+    maxActiveLanguages: number;
+}
+
+export function languageDisplayName(code: string): string {
+    try {
+        return new Intl.DisplayNames(['en'], { type: 'language' }).of(code) ?? code;
+    } catch {
+        return code;
+    }
+}
+
+export function fallbackSpeechLanguageCatalog(): SpeechLanguageCatalog {
+    return {
+        languages: FALLBACK_SPEECH_LANGUAGE_CODES.map((code) => ({
+            code,
+            label: languageDisplayName(code)
+        })),
+        maxActiveLanguages: 2
+    };
+}
+
+export function transcriptionLanguages(settings: Pick<AppSettings, 'dictateLanguages'>): string[] {
+    return settings.dictateLanguages.length > 0 ? settings.dictateLanguages : [...DEFAULT_DICTATE_LANGUAGES];
 }
 
 export type PromptOutputMode = 'clipboard' | 'window';

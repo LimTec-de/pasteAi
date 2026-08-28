@@ -1,6 +1,11 @@
 import { AppStore } from './store';
 import { CONFIG } from '../config';
-import type { AppSettings } from './types';
+import {
+    DEFAULT_DICTATE_LANGUAGES,
+    normalizeLanguageList,
+    uniqueLanguageCodes,
+    type AppSettings
+} from './types';
 
 export const DEFAULT_SETTINGS: AppSettings = {
     llmType: 'pasteai',
@@ -14,7 +19,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     improveHtml: true,
     dictateShortcut: CONFIG.DEFAULT_DICTATE_SHORTCUT,
     dictationProvider: 'openai',
-    dictateLanguage: 'auto',
+    dictateLanguages: [...DEFAULT_DICTATE_LANGUAGES],
+    dictateDownloadedLanguages: [...DEFAULT_DICTATE_LANGUAGES],
     dictateMicrophoneId: '',
     dictateOutputMode: 'insert'
 };
@@ -31,7 +37,8 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     improveHtml: 'improveHtml',
     dictateShortcut: 'dictateShortcut',
     dictationProvider: 'dictationProvider',
-    dictateLanguage: 'dictateLanguage',
+    dictateLanguages: 'dictateLanguages',
+    dictateDownloadedLanguages: 'dictateDownloadedLanguages',
     dictateMicrophoneId: 'dictateMicrophoneId',
     dictateOutputMode: 'dictateOutputMode'
 };
@@ -74,6 +81,11 @@ export class SettingsRepository {
             settings[key] = await this.get(key) as never;
         }
 
+        settings.dictateDownloadedLanguages = uniqueLanguageCodes([
+            ...settings.dictateDownloadedLanguages,
+            ...settings.dictateLanguages
+        ]);
+
         return settings;
     }
 
@@ -114,8 +126,8 @@ export class SettingsRepository {
     }
 
     private async migrateLegacySettings(): Promise<void> {
+        let hasChanges = await this.migrateLegacyDictateLanguage();
         const keys = Object.keys(DEFAULT_SETTINGS) as Array<keyof AppSettings>;
-        let hasChanges = false;
 
         for (const key of keys) {
             const currentKey = SETTINGS_KEYS[key];
@@ -155,10 +167,10 @@ export class SettingsRepository {
                 return (value === 'openai' || value === 'apple'
                     ? value
                     : DEFAULT_SETTINGS.dictationProvider) as AppSettings[K];
-            case 'dictateLanguage':
-                return (value === 'auto' || value === 'de' || value === 'en'
-                    ? value
-                    : DEFAULT_SETTINGS.dictateLanguage) as AppSettings[K];
+            case 'dictateLanguages':
+                return this.normalizeDictateLanguages(value) as AppSettings[K];
+            case 'dictateDownloadedLanguages':
+                return this.normalizeDownloadedLanguages(value) as AppSettings[K];
             case 'dictateOutputMode':
                 return (value === 'insert' || value === 'clipboard'
                     ? value
@@ -196,6 +208,34 @@ export class SettingsRepository {
             default:
                 return DEFAULT_SETTINGS[key];
         }
+    }
+
+    private async migrateLegacyDictateLanguage(): Promise<boolean> {
+        const legacy = await this.store.get<unknown>('dictateLanguage');
+        if (legacy === undefined) {
+            return false;
+        }
+
+        if (!(await this.store.has('dictateLanguages'))) {
+            const mapped = this.normalizeDictateLanguages(legacy);
+            await this.store.set('dictateLanguages', mapped);
+            if (!(await this.store.has('dictateDownloadedLanguages'))) {
+                await this.store.set('dictateDownloadedLanguages', mapped);
+            }
+        }
+
+        await this.store.delete('dictateLanguage');
+        return true;
+    }
+
+    private normalizeDictateLanguages(value: unknown): string[] {
+        const codes = normalizeLanguageList(value, DEFAULT_DICTATE_LANGUAGES);
+        return codes.length > 0 ? codes : [...DEFAULT_DICTATE_LANGUAGES];
+    }
+
+    private normalizeDownloadedLanguages(value: unknown): string[] {
+        const codes = normalizeLanguageList(value, DEFAULT_DICTATE_LANGUAGES);
+        return codes.length > 0 ? codes : [...DEFAULT_DICTATE_LANGUAGES];
     }
 
     private isEqual(left: unknown, right: unknown): boolean {

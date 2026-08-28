@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { fallbackSpeechLanguageCatalog, type SpeechLanguageCatalog } from './types';
 
 export interface AppleAvailability {
     available: boolean;
@@ -24,8 +25,28 @@ export async function improveWithApple(systemPrompt: string, text: string): Prom
     return invoke<string>('apple_improve', { systemPrompt, text });
 }
 
-export async function startAppleDictation(language?: string, deviceUid?: string): Promise<void> {
-    await invoke('apple_dictation_start', { language, deviceUid });
+export async function startAppleDictation(languages: string[], deviceUid?: string): Promise<void> {
+    await invoke('apple_dictation_start', { languages, deviceUid });
+}
+
+export async function listSpeechLanguages(): Promise<SpeechLanguageCatalog> {
+    try {
+        const catalog = await invoke<SpeechLanguageCatalog>('apple_list_speech_languages');
+        if (catalog.languages.length > 0) {
+            return {
+                languages: catalog.languages,
+                maxActiveLanguages: Math.max(1, catalog.maxActiveLanguages || 2)
+            };
+        }
+    } catch (error) {
+        console.warn('Could not list Apple speech languages:', error);
+    }
+
+    return fallbackSpeechLanguageCatalog();
+}
+
+export async function installSpeechLanguage(code: string): Promise<void> {
+    await invoke('apple_install_speech_language', { code });
 }
 
 export async function stopAppleDictation(): Promise<string> {

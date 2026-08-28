@@ -88,17 +88,61 @@ public func pasteai_apple_dictation_start(
         return 1
     }
 
-    let languageValue = language.map { String(cString: $0) } ?? ""
+    let languagesValue = language.map { String(cString: $0) } ?? ""
     let deviceValue = deviceUID.map { String(cString: $0) } ?? ""
     do {
         try runBlocking {
             try await DictationSession.shared.start(
                 levelCb: levelCb,
                 ctx: ctx,
-                language: languageValue,
+                languages: languagesValue,
                 deviceUID: deviceValue
             )
         }
+        return 0
+    } catch {
+        outError.pointee = dup(error.localizedDescription)
+        return 1
+    }
+}
+
+@_cdecl("pasteai_apple_list_speech_languages")
+public func pasteai_apple_list_speech_languages(
+    outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>,
+    outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+) -> Int32 {
+    outJson.pointee = nil
+    outError.pointee = nil
+    do {
+        let catalog: SpeechLanguageCatalogDTO
+        if #available(macOS 26.0, *) {
+            catalog = runBlocking { await listSpeechLanguagesMac26() }
+        } else {
+            catalog = fallbackSpeechLanguageCatalog()
+        }
+        let data = try JSONEncoder().encode(catalog)
+        outJson.pointee = dup(String(data: data, encoding: .utf8) ?? "{}")
+        return 0
+    } catch {
+        outError.pointee = dup(error.localizedDescription)
+        return 1
+    }
+}
+
+@_cdecl("pasteai_apple_install_speech_language")
+public func pasteai_apple_install_speech_language(
+    code: UnsafePointer<CChar>?,
+    outError: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>
+) -> Int32 {
+    outError.pointee = nil
+    guard #available(macOS 26.0, *) else {
+        outError.pointee = dup("Requires macOS 26 or later.")
+        return 1
+    }
+
+    let languageCode = code.map { String(cString: $0) } ?? ""
+    do {
+        try runBlocking { try await installSpeechLanguageMac26(languageCode) }
         return 0
     } catch {
         outError.pointee = dup(error.localizedDescription)
@@ -150,6 +194,33 @@ public func pasteai_apple_dictation_cancel() {
     if #available(macOS 26.0, *) {
         runBlocking { await DictationSession.shared.cancel() }
     }
+}
+
+private struct SpeechLanguageDTO: Encodable {
+    let code: String
+    let label: String
+}
+
+private struct SpeechLanguageCatalogDTO: Encodable {
+    let languages: [SpeechLanguageDTO]
+    let maxActiveLanguages: Int
+}
+
+private let fallbackSpeechLanguageCodes = [
+    "ar", "da", "de", "en", "es", "fi", "fr", "he", "it", "ja", "ko",
+    "ms", "nb", "nl", "pt", "ru", "sv", "th", "tr", "vi", "yue", "zh"
+]
+
+private func fallbackSpeechLanguageCatalog() -> SpeechLanguageCatalogDTO {
+    speechLanguageCatalog(codes: fallbackSpeechLanguageCodes, maxActive: 2)
+}
+
+private func speechLanguageCatalog(codes: [String], maxActive: Int) -> SpeechLanguageCatalogDTO {
+    let english = Locale(identifier: "en")
+    let languages = codes.map { code in
+        SpeechLanguageDTO(code: code, label: english.localizedString(forLanguageCode: code) ?? code)
+    }.sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+    return SpeechLanguageCatalogDTO(languages: languages, maxActiveLanguages: max(1, maxActive))
 }
 
 private struct Availability: Sendable {
@@ -307,37 +378,76 @@ private func speechAvailabilityMac26() async -> Availability {
         return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
     }
 
-    guard let locale = await resolveSpeechLocales(language: "auto").first else {
+    let supported = await SpeechTranscriber.supportedLocales
+    guard !supported.isEmpty else {
         return Availability(false, "notAvailable", "On-device speech recognition is not available on this Mac.")
     }
 
-    return await SpeechAssetInstaller.shared.availability(locale: locale)
+    return Availability(true, "available", "")
 #else
     return Availability(false, "osTooOld", "Requires macOS 26 or later.")
 #endif
 }
 
 @available(macOS 26.0, *)
-private func resolveSpeechLocales(language: String) async -> [Locale] {
+private func listSpeechLanguagesMac26() async -> SpeechLanguageCatalogDTO {
 #if canImport(Speech)
-    let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
-    let hints: [String]
-    if !trimmed.isEmpty && trimmed != "auto" {
-        switch trimmed {
-        case "de":
-            hints = ["de_DE"]
-        case "en":
-            hints = ["en_US"]
-        default:
-            hints = [trimmed]
+    let supported = await SpeechTranscriber.supportedLocales
+    var seen = Set<String>()
+    var codes: [String] = []
+    for locale in supported {
+        guard let code = locale.language.languageCode?.identifier.lowercased() else {
+            continue
         }
-    } else {
-        hints = autoSpeechHints()
+        if seen.insert(code).inserted {
+            codes.append(code)
+        }
     }
+    let maxActive = AssetInventory.maximumReservedLocales
+    return speechLanguageCatalog(codes: codes, maxActive: maxActive)
+#else
+    return fallbackSpeechLanguageCatalog()
+#endif
+}
 
+@available(macOS 26.0, *)
+private func installSpeechLanguageMac26(_ code: String) async throws {
+#if canImport(Speech)
+    let locales = await resolveSpeechLocales(codes: [code])
+    guard let locale = locales.first else {
+        throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition does not support this language."])
+    }
+    try await SpeechAssetInstaller.shared.ensureInstalled(locale: locale)
+#else
+    throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "Requires macOS 26 or later."])
+#endif
+}
+
+@available(macOS 26.0, *)
+private func resolveSpeechLocales(fromJoined language: String) async -> [Locale] {
+    let codes = language.split(separator: ",").map { String($0) }
+    return await resolveSpeechLocales(codes: codes)
+}
+
+@available(macOS 26.0, *)
+private func resolveSpeechLocales(codes: [String]) async -> [Locale] {
+#if canImport(Speech)
     var locales: [Locale] = []
     var seen = Set<String>()
-    for hint in hints {
+    for raw in codes {
+        let code = raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !code.isEmpty, code != "auto" else {
+            continue
+        }
+        let hint: String
+        switch code {
+        case "de":
+            hint = "de_DE"
+        case "en":
+            hint = "en_US"
+        default:
+            hint = code
+        }
         guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: Locale(identifier: hint)) else {
             continue
         }
@@ -349,29 +459,6 @@ private func resolveSpeechLocales(language: String) async -> [Locale] {
 #else
     return []
 #endif
-}
-
-@available(macOS 26.0, *)
-private func autoSpeechHints() -> [String] {
-    var hints: [String] = []
-    func add(_ identifier: String) {
-        if !hints.contains(identifier) {
-            hints.append(identifier)
-        }
-    }
-
-    let codes = (Locale.preferredLanguages + [Locale.current.identifier]).compactMap { identifier -> String? in
-        Locale(identifier: identifier).language.languageCode?.identifier
-    }
-    if codes.contains("de") {
-        add("de_DE")
-    }
-    if codes.contains("en") {
-        add("en_US")
-    }
-    add("de_DE")
-    add("en_US")
-    return hints
 }
 
 #if canImport(Speech)
@@ -430,35 +517,6 @@ private final class SpeechAssetInstaller: @unchecked Sendable {
     private let lock = NSLock()
     private var inFlight: [String: Task<Void, Error>] = [:]
     private var succeeded: Set<String> = []
-    private var errors: [String: String] = [:]
-    private var progress: [String: Progress] = [:]
-
-    func availability(locale: Locale) async -> Availability {
-        let key = localeKey(locale)
-        let transcriber = SpeechTranscriber(locale: locale, preset: speechTranscriberPreset())
-        if isSucceeded(key) {
-            return Availability(true, "available", "")
-        }
-        if await assetsReady(transcriber: transcriber, locale: locale) {
-            return Availability(true, "available", "")
-        }
-
-        lock.lock()
-        let flying = inFlight[key] != nil
-        let error = errors[key]
-        let message = progressMessageLocked(key)
-        lock.unlock()
-
-        if flying {
-            return Availability(true, "assetsNotReady", message)
-        }
-        if let error {
-            return Availability(false, "assetsFailed", error)
-        }
-
-        startIfNeeded(locale: locale, key: key)
-        return Availability(true, "assetsNotReady", message)
-    }
 
     func ensureInstalled(locale: Locale) async throws {
         let key = localeKey(locale)
@@ -472,38 +530,26 @@ private final class SpeechAssetInstaller: @unchecked Sendable {
         try await taskFor(locale: locale, key: key).value
     }
 
-    private func startIfNeeded(locale: Locale, key: String) {
-        _ = taskFor(locale: locale, key: key)
-    }
-
     private func taskFor(locale: Locale, key: String) -> Task<Void, Error> {
         lock.lock()
         if let existing = inFlight[key] {
             lock.unlock()
             return existing
         }
-        errors[key] = nil
         let task = Task<Void, Error> {
             do {
                 try await AssetInventory.reserve(locale: locale)
                 let transcriber = SpeechTranscriber(locale: locale, preset: speechTranscriberPreset())
                 if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
-                    self.lock.lock()
-                    self.progress[key] = request.progress
-                    self.lock.unlock()
                     try await request.downloadAndInstall()
                 }
                 self.lock.lock()
                 self.succeeded.insert(key)
-                self.errors[key] = nil
-                self.progress[key] = nil
                 self.inFlight[key] = nil
                 self.lock.unlock()
             } catch {
                 self.lock.lock()
                 self.succeeded.remove(key)
-                self.errors[key] = error.localizedDescription
-                self.progress[key] = nil
                 self.inFlight[key] = nil
                 self.lock.unlock()
                 throw error
@@ -532,14 +578,6 @@ private final class SpeechAssetInstaller: @unchecked Sendable {
         let installed = await SpeechTranscriber.installedLocales
         return installed.contains { $0.identifier(.bcp47) == wanted }
     }
-
-    private func progressMessageLocked(_ key: String) -> String {
-        let fraction = progress[key]?.fractionCompleted ?? 0
-        if fraction > 0 && fraction < 1 {
-            return "macOS is still installing on-device speech recognition (\(Int((fraction * 100).rounded()))%)."
-        }
-        return "macOS is still installing on-device speech recognition."
-    }
 }
 #endif
 
@@ -562,7 +600,7 @@ private final class DictationSession: @unchecked Sendable {
     func start(
         levelCb: PasteAILevelCallback?,
         ctx: UnsafeMutableRawPointer?,
-        language: String,
+        languages: String,
         deviceUID: String
     ) async throws {
         lock.lock()
@@ -576,29 +614,17 @@ private final class DictationSession: @unchecked Sendable {
         guard SpeechTranscriber.isAvailable else {
             throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
         }
-        let specifiedLanguage = {
-            let trimmed = language.trimmingCharacters(in: .whitespacesAndNewlines)
-            return !trimmed.isEmpty && trimmed != "auto"
-        }()
-        let locales = await resolveSpeechLocales(language: language)
+        let resolved = await resolveSpeechLocales(fromJoined: languages)
+        let maxActive = max(1, AssetInventory.maximumReservedLocales)
+        let locales = Array(resolved.prefix(maxActive))
         guard !locales.isEmpty else {
-            if specifiedLanguage {
-                throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition does not support this language."])
-            }
-            throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition is not available on this Mac."])
+            throw NSError(domain: "pasteAI", code: 3, userInfo: [NSLocalizedDescriptionKey: "On-device speech recognition does not support these languages."])
         }
 
         var installed: [Locale] = []
         for locale in locales {
-            do {
-                try await SpeechAssetInstaller.shared.ensureInstalled(locale: locale)
-                installed.append(locale)
-            } catch {
-                if installed.isEmpty {
-                    throw error
-                }
-                break
-            }
+            try await SpeechAssetInstaller.shared.ensureInstalled(locale: locale)
+            installed.append(locale)
         }
 
         let preset = speechTranscriberPreset()

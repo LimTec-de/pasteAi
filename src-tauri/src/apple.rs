@@ -20,6 +20,19 @@ pub struct AudioInputDevice {
     pub label: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SpeechLanguage {
+    pub code: String,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SpeechLanguageCatalog {
+    pub languages: Vec<SpeechLanguage>,
+    pub max_active_languages: i32,
+}
+
 #[cfg(not(target_os = "macos"))]
 fn not_mac() -> AppleAvailability {
     AppleAvailability {
@@ -72,19 +85,19 @@ pub async fn apple_improve(system_prompt: String, text: String) -> Result<String
 #[tauri::command]
 pub async fn apple_dictation_start(
     app: AppHandle,
-    language: Option<String>,
+    languages: Vec<String>,
     device_uid: Option<String>,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        let language = language.unwrap_or_default();
+        let language = languages.join(",");
         let device_uid = device_uid.unwrap_or_default();
         return blocking(move || macos::dictation_start(app, &language, &device_uid)).await?;
     }
 
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, language, device_uid);
+        let _ = (app, languages, device_uid);
         Err("Only available on Mac.".to_string())
     }
 }
@@ -98,6 +111,69 @@ pub async fn apple_list_input_devices() -> Result<Vec<AudioInputDevice>, String>
 
     #[cfg(not(target_os = "macos"))]
     Ok(Vec::new())
+}
+
+#[tauri::command]
+pub async fn apple_list_speech_languages() -> Result<SpeechLanguageCatalog, String> {
+    #[cfg(target_os = "macos")]
+    {
+        return blocking(macos::list_speech_languages).await?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    Ok(fallback_speech_catalog())
+}
+
+#[tauri::command]
+pub async fn apple_install_speech_language(code: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        return blocking(move || macos::install_speech_language(&code)).await?;
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = code;
+        Err("Only available on Mac.".to_string())
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn fallback_speech_catalog() -> SpeechLanguageCatalog {
+    const CODES: &[(&str, &str)] = &[
+        ("ar", "Arabic"),
+        ("da", "Danish"),
+        ("de", "German"),
+        ("en", "English"),
+        ("es", "Spanish"),
+        ("fi", "Finnish"),
+        ("fr", "French"),
+        ("he", "Hebrew"),
+        ("it", "Italian"),
+        ("ja", "Japanese"),
+        ("ko", "Korean"),
+        ("ms", "Malay"),
+        ("nb", "Norwegian Bokmål"),
+        ("nl", "Dutch"),
+        ("pt", "Portuguese"),
+        ("ru", "Russian"),
+        ("sv", "Swedish"),
+        ("th", "Thai"),
+        ("tr", "Turkish"),
+        ("vi", "Vietnamese"),
+        ("yue", "Cantonese"),
+        ("zh", "Chinese"),
+    ];
+    SpeechLanguageCatalog {
+        languages: CODES
+            .iter()
+            .map(|(code, label)| SpeechLanguage {
+                code: (*code).to_string(),
+                label: (*label).to_string(),
+            })
+            .collect(),
+        max_active_languages: 2,
+    }
 }
 
 #[tauri::command]
@@ -177,6 +253,14 @@ mod macos {
             out_json: *mut *mut c_char,
             out_error: *mut *mut c_char,
         ) -> c_int;
+        fn pasteai_apple_list_speech_languages(
+            out_json: *mut *mut c_char,
+            out_error: *mut *mut c_char,
+        ) -> c_int;
+        fn pasteai_apple_install_speech_language(
+            code: *const c_char,
+            out_error: *mut *mut c_char,
+        ) -> c_int;
         fn pasteai_apple_dictation_stop(
             out_text: *mut *mut c_char,
             out_error: *mut *mut c_char,
@@ -237,6 +321,39 @@ mod macos {
         } else {
             Err(if error.is_empty() {
                 "Could not start on-device dictation".to_string()
+            } else {
+                error
+            })
+        }
+    }
+
+    pub fn list_speech_languages() -> Result<super::SpeechLanguageCatalog, String> {
+        let mut out_json: *mut c_char = std::ptr::null_mut();
+        let mut out_error: *mut c_char = std::ptr::null_mut();
+        let status = unsafe { pasteai_apple_list_speech_languages(&mut out_json, &mut out_error) };
+        let error = take_string(out_error);
+        let json = take_string(out_json);
+        if status != 0 {
+            return Err(if error.is_empty() {
+                "Could not list speech languages".to_string()
+            } else {
+                error
+            });
+        }
+
+        serde_json::from_str(&json).map_err(|error| error.to_string())
+    }
+
+    pub fn install_speech_language(code: &str) -> Result<(), String> {
+        let code = CString::new(code).map_err(|error| error.to_string())?;
+        let mut out_error: *mut c_char = std::ptr::null_mut();
+        let status = unsafe { pasteai_apple_install_speech_language(code.as_ptr(), &mut out_error) };
+        let error = take_string(out_error);
+        if status == 0 {
+            Ok(())
+        } else {
+            Err(if error.is_empty() {
+                "Could not install speech language".to_string()
             } else {
                 error
             })

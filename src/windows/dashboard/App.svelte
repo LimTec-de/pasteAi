@@ -11,8 +11,19 @@
     import { PromptRepository } from '../../domain/prompt-repository';
     import { DEFAULT_SETTINGS, SettingsRepository } from '../../domain/settings-repository';
     import { ProviderGateway } from '../../domain/provider-gateway';
-    import type { AppSettings, DashboardSection, DictateOutputMode, DictationProviderId, PromptOption, PromptOutputMode, ProviderId } from '../../domain/types';
-    import { getAppleSpeechAvailability, getAppleTextAvailability, listAppleInputDevices, type AppleAvailability, type AudioInputDevice, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
+    import {
+        fallbackSpeechLanguageCatalog,
+        languageDisplayName,
+        type AppSettings,
+        type DashboardSection,
+        type DictateOutputMode,
+        type DictationProviderId,
+        type PromptOption,
+        type PromptOutputMode,
+        type ProviderId,
+        type SpeechLanguageCatalog
+    } from '../../domain/types';
+    import { getAppleSpeechAvailability, getAppleTextAvailability, installSpeechLanguage, listAppleInputDevices, listSpeechLanguages, type AppleAvailability, type AudioInputDevice, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -55,6 +66,10 @@
     let shortcutIsError = false;
     let microphoneDevices: AudioInputDevice[] = [];
     let microphoneMessage = '';
+    let speechCatalog: SpeechLanguageCatalog = fallbackSpeechLanguageCatalog();
+    let languagePickerOpen = false;
+    let languageMessage = '';
+    let installingLanguage: string | null = null;
     let speechAssetPoll: ReturnType<typeof setInterval> | null = null;
 
     let version = 'Loading version...';
@@ -115,6 +130,7 @@
         }
         if (section === 'dictation') {
             void refreshMicrophones();
+            void refreshSpeechLanguages();
         }
     }
 
@@ -149,6 +165,7 @@
         await refreshPromptState();
         await refreshProviderState();
         await refreshAppleAvailability();
+        await refreshSpeechLanguages();
     }
 
     async function refreshPromptState(preferredPromptId?: number | null): Promise<void> {
@@ -347,8 +364,69 @@
         void saveDictateShortcut(accelerator);
     }
 
-    async function handleDictateLanguageChange(): Promise<void> {
-        await updateSettings({ dictateLanguage: settings.dictateLanguage });
+    function languageLabel(code: string): string {
+        return speechCatalog.languages.find((language) => language.code === code)?.label
+            ?? languageDisplayName(code);
+    }
+
+    function isDictateLanguageActive(code: string): boolean {
+        return settings.dictateLanguages.includes(code);
+    }
+
+    async function refreshSpeechLanguages(): Promise<void> {
+        speechCatalog = await listSpeechLanguages();
+    }
+
+    async function toggleDictateLanguage(code: string): Promise<void> {
+        const active = settings.dictateLanguages;
+        if (active.includes(code)) {
+            if (active.length <= 1) {
+                return;
+            }
+            await updateSettings({ dictateLanguages: active.filter((item) => item !== code) });
+            return;
+        }
+
+        if (active.length >= speechCatalog.maxActiveLanguages) {
+            return;
+        }
+
+        await updateSettings({ dictateLanguages: [...active, code] });
+    }
+
+    async function addDictateLanguage(code: string): Promise<void> {
+        languagePickerOpen = false;
+        if (!code || settings.dictateDownloadedLanguages.includes(code) || installingLanguage) {
+            return;
+        }
+
+        languageMessage = '';
+        installingLanguage = code;
+        try {
+            if (settings.dictationProvider === 'apple') {
+                await installSpeechLanguage(code);
+            }
+
+            const downloaded = [...settings.dictateDownloadedLanguages, code];
+            const active = settings.dictateLanguages.length < speechCatalog.maxActiveLanguages
+                ? [...settings.dictateLanguages, code]
+                : settings.dictateLanguages;
+            await updateSettings({
+                dictateDownloadedLanguages: downloaded,
+                dictateLanguages: active
+            });
+        } catch (error) {
+            languageMessage = error instanceof Error ? error.message : 'Could not add language.';
+        } finally {
+            installingLanguage = null;
+        }
+    }
+
+    function handleAddLanguageChange(event: Event): void {
+        const select = event.currentTarget as HTMLSelectElement;
+        const code = select.value;
+        select.value = '';
+        void addDictateLanguage(code);
     }
 
     async function handleDictateMicrophoneChange(event: Event): Promise<void> {
@@ -857,14 +935,57 @@
 
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
-                                <label for="dictateLanguage">Language</label>
-                                <span>Auto uses German and English. On-device dictation runs both and keeps the better transcript.</span>
+                                <label>Languages</label>
+                                <span>Filled chips are used for dictation. Outline chips stay downloaded but idle. At least one stays on; at most {speechCatalog.maxActiveLanguages} can run at once.</span>
                             </div>
-                            <select id="dictateLanguage" bind:value={settings.dictateLanguage} on:change={() => void handleDictateLanguageChange()}>
-                                <option value="auto">Auto</option>
-                                <option value="de">German</option>
-                                <option value="en">English</option>
-                            </select>
+                            <div class="language-chips">
+                                {#each settings.dictateDownloadedLanguages as code}
+                                    <button
+                                        type="button"
+                                        class="language-chip"
+                                        class:is-active={isDictateLanguageActive(code)}
+                                        title={isDictateLanguageActive(code)
+                                            ? (settings.dictateLanguages.length <= 1
+                                                ? 'At least one language must stay on'
+                                                : `Use ${languageLabel(code)}`)
+                                            : (settings.dictateLanguages.length >= speechCatalog.maxActiveLanguages
+                                                ? 'Turn another language off first'
+                                                : `Use ${languageLabel(code)}`)}
+                                        on:click={() => void toggleDictateLanguage(code)}
+                                    >
+                                        {languageLabel(code)}
+                                    </button>
+                                {/each}
+                                {#if installingLanguage}
+                                    <span class="language-chip language-chip--busy">
+                                        Downloading {languageLabel(installingLanguage)}
+                                    </span>
+                                {:else if speechCatalog.languages.some((language) => !settings.dictateDownloadedLanguages.includes(language.code))}
+                                    {#if languagePickerOpen}
+                                        <select
+                                            class="language-chip-picker"
+                                            on:change={handleAddLanguageChange}
+                                        >
+                                            <option value="">Add language…</option>
+                                            {#each speechCatalog.languages.filter((language) => !settings.dictateDownloadedLanguages.includes(language.code)) as language}
+                                                <option value={language.code}>{language.label}</option>
+                                            {/each}
+                                        </select>
+                                    {:else}
+                                        <button
+                                            type="button"
+                                            class="language-chip language-chip--add"
+                                            title="Download another language"
+                                            on:click={() => { languagePickerOpen = true; }}
+                                        >
+                                            +
+                                        </button>
+                                    {/if}
+                                {/if}
+                            </div>
+                            {#if languageMessage}
+                                <div class="status is-visible status--error">{languageMessage}</div>
+                            {/if}
                         </section>
 
                         <section class="provider-panel panel-card is-visible">

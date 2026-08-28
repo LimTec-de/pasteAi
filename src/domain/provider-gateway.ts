@@ -194,7 +194,7 @@ export class ProviderGateway {
                             transcription: {
                                 model: 'gpt-transcribe',
                                 prompt: 'Desktop dictation into the clipboard. Transcribe speech as written text.',
-                                languages: transcriptionLanguages(settings.dictateLanguage)
+                                languages: transcriptionLanguages(settings)
                             },
                             turn_detection: null
                         }

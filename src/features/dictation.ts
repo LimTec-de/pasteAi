@@ -138,7 +138,7 @@ export class DictationController {
     private async beginSession(): Promise<void> {
         const settings = await this.settingsRepository.getAll();
         const shortcut = settings.dictateShortcut.trim() || CONFIG.DEFAULT_DICTATE_SHORTCUT;
-        const languages = transcriptionLanguages(settings.dictateLanguage);
+        const languages = transcriptionLanguages(settings);
         const microphoneId = settings.dictateMicrophoneId.trim();
         const outputMode = settings.dictateOutputMode;
 
@@ -159,7 +159,7 @@ export class DictationController {
             });
 
             try {
-                await startAppleDictation(settings.dictateLanguage, microphoneId);
+                await startAppleDictation(languages, microphoneId);
                 if (this.cancelled) {
                     await cancelAppleDictation().catch(() => undefined);
                     return;

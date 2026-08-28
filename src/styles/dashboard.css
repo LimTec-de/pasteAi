@@ -353,6 +353,55 @@
     color: #ffffff;
 }
 
+.language-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+}
+
+.language-chip {
+    padding: 0.38rem 0.8rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-strong);
+    background: transparent;
+    color: var(--color-muted);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition:
+        background-color var(--transition-standard),
+        color var(--transition-standard),
+        border-color var(--transition-standard);
+}
+
+.language-chip.is-active {
+    background: var(--color-accent);
+    border-color: transparent;
+    color: #ffffff;
+}
+
+.language-chip--add {
+    min-width: 2.1rem;
+    padding-inline: 0.55rem;
+}
+
+.language-chip--busy {
+    cursor: default;
+    border-style: dashed;
+}
+
+.language-chip-picker {
+    min-height: 2rem;
+    padding: 0.3rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
 .detail-empty {
     display: grid;
     place-items: center;
