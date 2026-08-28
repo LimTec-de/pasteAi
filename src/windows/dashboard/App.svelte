@@ -12,6 +12,7 @@
     import { DEFAULT_SETTINGS, SettingsRepository } from '../../domain/settings-repository';
     import { ProviderGateway } from '../../domain/provider-gateway';
     import {
+        DEFAULT_DICTATE_PROMPT_ID,
         fallbackSpeechLanguageCatalog,
         languageDisplayName,
         type AppSettings,
@@ -121,6 +122,12 @@
         ? settings.dictateMicrophoneId
         : '';
 
+    $: selectedDictatePromptValue = settings.dictatePromptId === null
+        ? ''
+        : (prompts.some((prompt) => prompt.id === settings.dictatePromptId)
+            ? String(settings.dictatePromptId)
+            : String(DEFAULT_DICTATE_PROMPT_ID));
+
     function setActiveSection(section: DashboardSection): void {
         activeSection = section;
         scrollActiveSectionToTop(section);
@@ -131,6 +138,7 @@
         if (section === 'dictation') {
             void refreshMicrophones();
             void refreshSpeechLanguages();
+            void healDictatePromptId();
         }
     }
 
@@ -163,6 +171,7 @@
         version = `Version ${await getVersion()}`;
 
         await refreshPromptState();
+        await healDictatePromptId();
         await refreshProviderState();
         await refreshAppleAvailability();
         await refreshSpeechLanguages();
@@ -436,6 +445,25 @@
 
     async function handleDictateOutputModeChange(mode: DictateOutputMode): Promise<void> {
         await updateSettings({ dictateOutputMode: mode });
+    }
+
+    async function handleDictatePromptChange(event: Event): Promise<void> {
+        const value = (event.currentTarget as HTMLSelectElement).value;
+        const dictatePromptId = value === '' ? null : Number.parseInt(value, 10);
+        await updateSettings({ dictatePromptId });
+    }
+
+    async function healDictatePromptId(): Promise<void> {
+        const id = settings.dictatePromptId;
+        if (id === null) {
+            return;
+        }
+
+        if (prompts.some((prompt) => prompt.id === id)) {
+            return;
+        }
+
+        await updateSettings({ dictatePromptId: DEFAULT_DICTATE_PROMPT_ID });
     }
 
     async function refreshMicrophones(): Promise<void> {
@@ -1015,6 +1043,19 @@
                                     <button class:is-active={settings.dictateOutputMode === 'clipboard'} type="button" on:click={() => void handleDictateOutputModeChange('clipboard')}>Copy only</button>
                                 </div>
                             </div>
+                        </section>
+
+                        <section class="provider-panel panel-card is-visible">
+                            <div class="field-label">
+                                <label for="dictatePrompt">After speech</label>
+                                <span>Rewrite with the AI provider before insert or copy. Choose Don’t rewrite for the raw transcript.</span>
+                            </div>
+                            <select id="dictatePrompt" value={selectedDictatePromptValue} on:change={(event) => void handleDictatePromptChange(event)}>
+                                <option value="">Don’t rewrite</option>
+                                {#each prompts as prompt}
+                                    <option value={String(prompt.id)}>{prompt.title}</option>
+                                {/each}
+                            </select>
                         </section>
                     </div>
                 </section>

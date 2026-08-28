@@ -10,6 +10,8 @@ export type DashboardSection = 'welcome' | 'providers' | 'dictation' | 'prompts'
 
 export const DEFAULT_DICTATE_LANGUAGES = ['de', 'en'];
 
+export const DEFAULT_DICTATE_PROMPT_ID = 6;
+
 export const FALLBACK_SPEECH_LANGUAGE_CODES = [
     'ar', 'da', 'de', 'en', 'es', 'fi', 'fr', 'he', 'it', 'ja', 'ko',
     'ms', 'nb', 'nl', 'pt', 'ru', 'sv', 'th', 'tr', 'vi', 'yue', 'zh'
@@ -31,6 +33,7 @@ export interface AppSettings {
     dictateDownloadedLanguages: string[];
     dictateMicrophoneId: string;
     dictateOutputMode: DictateOutputMode;
+    dictatePromptId: number | null;
 }
 
 export function isLanguageCode(value: string): boolean {

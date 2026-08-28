@@ -2,6 +2,7 @@ import { AppStore } from './store';
 import { CONFIG } from '../config';
 import {
     DEFAULT_DICTATE_LANGUAGES,
+    DEFAULT_DICTATE_PROMPT_ID,
     normalizeLanguageList,
     uniqueLanguageCodes,
     type AppSettings
@@ -22,7 +23,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     dictateLanguages: [...DEFAULT_DICTATE_LANGUAGES],
     dictateDownloadedLanguages: [...DEFAULT_DICTATE_LANGUAGES],
     dictateMicrophoneId: '',
-    dictateOutputMode: 'insert'
+    dictateOutputMode: 'insert',
+    dictatePromptId: DEFAULT_DICTATE_PROMPT_ID
 };
 
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
@@ -40,7 +42,8 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     dictateLanguages: 'dictateLanguages',
     dictateDownloadedLanguages: 'dictateDownloadedLanguages',
     dictateMicrophoneId: 'dictateMicrophoneId',
-    dictateOutputMode: 'dictateOutputMode'
+    dictateOutputMode: 'dictateOutputMode',
+    dictatePromptId: 'dictatePromptId'
 };
 
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
@@ -175,6 +178,23 @@ export class SettingsRepository {
                 return (value === 'insert' || value === 'clipboard'
                     ? value
                     : DEFAULT_SETTINGS.dictateOutputMode) as AppSettings[K];
+            case 'dictatePromptId':
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                    return value as AppSettings[K];
+                }
+
+                if (typeof value === 'string') {
+                    if (value.trim() === '') {
+                        return null as AppSettings[K];
+                    }
+
+                    const parsedValue = Number.parseInt(value, 10);
+                    return (Number.isFinite(parsedValue)
+                        ? parsedValue
+                        : DEFAULT_SETTINGS.dictatePromptId) as AppSettings[K];
+                }
+
+                return (value === null ? null : DEFAULT_SETTINGS.dictatePromptId) as AppSettings[K];
             case 'openaiApiKey':
             case 'ollamaUrl':
             case 'ollamaModel':

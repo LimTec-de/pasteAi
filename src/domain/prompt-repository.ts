@@ -1,4 +1,4 @@
-import type { PromptOption, PromptOutputMode } from './types';
+import { DEFAULT_DICTATE_PROMPT_ID, type PromptOption, type PromptOutputMode } from './types';
 import { SettingsRepository } from './settings-repository';
 
 export const DEFAULT_PROMPTS: PromptOption[] = [
@@ -43,6 +43,13 @@ export const DEFAULT_PROMPTS: PromptOption[] = [
         outputMode: 'window',
         title: 'Shell command helper',
         prompt: 'Act as a shell command generator for macOS and Linux (bash/zsh). Convert the request into a single runnable command line. Chain steps with &&. When the task needs input (e.g. a commit message), use read, like: read -r -p "Commit message: " MESSAGE. Be conservative and never produce destructive commands (for example rm -rf, git reset --hard, force pushes, dropping databases, or overwriting files). If the request would be destructive, output only a single echo explaining why, e.g. echo "Refusing: removing all branches is destructive". If you are missing information needed to build the command, output only a single echo asking for it, e.g. echo "I need the remote name to do the push". Otherwise output only the raw command with no explanation, no comments, and no markdown code fences or backticks. Do not add a trailing newline. If the input is already a valid, non-destructive shell command, return it unchanged.'
+    },
+    {
+        id: DEFAULT_DICTATE_PROMPT_ID,
+        identifier: 'dictate-cleanup',
+        outputMode: 'clipboard',
+        title: 'Clean up dictation',
+        prompt: 'Act as a dictation cleanup editor. The input is a speech-to-text transcript. Remove filler words (um, uh, äh, ähm, like, you know), false starts, self-corrections, and repeated words. When the speaker corrects themselves, keep only the last intended wording. Keep the original language. Do not add information, do not answer questions, and do not change the meaning. Output only the cleaned text.'
     }
 ];
 
@@ -180,6 +187,18 @@ export class PromptRepository {
         }
 
         return prompt;
+    }
+
+    async getDictatePrompt(): Promise<PromptOption | null> {
+        const dictatePromptId = await this.settingsRepository.get('dictatePromptId');
+        if (dictatePromptId === null) {
+            return null;
+        }
+
+        const prompts = await this.getAllPrompts();
+        return prompts.find((entry) => entry.id === dictatePromptId)
+            ?? prompts.find((entry) => entry.id === DEFAULT_DICTATE_PROMPT_ID)
+            ?? null;
     }
 
     private async getUserPrompts(): Promise<PromptOption[]> {

@@ -5,6 +5,7 @@ import clipboard from 'tauri-plugin-clipboard-api';
 import { APP_EVENTS, type DictateCommitPayload } from '../app/events';
 import { CONFIG } from '../config';
 import { ProviderGateway } from '../domain/provider-gateway';
+import { PromptRepository } from '../domain/prompt-repository';
 import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import type { StatusType } from '../domain/types';
@@ -25,6 +26,7 @@ export class DictationController {
 
     constructor(
         private readonly settingsRepository: SettingsRepository,
+        private readonly promptRepository: PromptRepository,
         private readonly providerGateway: ProviderGateway,
         private readonly windows: AppWindows,
         private readonly clipboardImprover: ClipboardImprover
@@ -267,8 +269,38 @@ export class DictationController {
             return;
         }
 
-        this.clipboardImprover.suppressNextWrite(transcript);
-        await clipboard.writeText(transcript);
+        let text = transcript;
+        const prompt = await this.promptRepository.getDictatePrompt();
+        if (prompt) {
+            try {
+                await this.showStatus('Improving...', 'working', { autohide: false });
+                text = await this.providerGateway.improve(transcript, prompt.prompt);
+            } catch (error) {
+                console.error('Could not improve dictation:', error);
+                this.clipboardImprover.endDictation();
+                await invoke('restore_frontmost_app').catch((restoreError) => {
+                    console.warn('Could not restore frontmost app:', restoreError);
+                });
+
+                const providerError = error as Error & { data?: { type?: string } };
+                if (providerError.data?.type === 'quota') {
+                    await this.showStatus(
+                        'No tokens left! <a href="https://pasteai.app/tokens.html" target="_blank">Click here to recharge</a>',
+                        'error',
+                        { allowHtml: true }
+                    );
+                } else {
+                    await this.showStatus(
+                        `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
+                        'error'
+                    );
+                }
+                return;
+            }
+        }
+
+        this.clipboardImprover.suppressNextWrite(text);
+        await clipboard.writeText(text);
 
         const outputMode = await this.settingsRepository.get('dictateOutputMode');
         if (outputMode === 'clipboard') {
@@ -306,7 +338,16 @@ export class DictationController {
         });
     }
 
-    private async showStatus(message: string, type: StatusType): Promise<void> {
-        await this.windows.showStatus({ message, type });
+    private async showStatus(
+        message: string,
+        type: StatusType,
+        options: { autohide?: boolean; allowHtml?: boolean } = {}
+    ): Promise<void> {
+        await this.windows.showStatus({
+            message,
+            type,
+            autohide: options.autohide,
+            allowHtml: options.allowHtml
+        });
     }
 }

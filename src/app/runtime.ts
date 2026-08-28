@@ -22,7 +22,7 @@ export class AppRuntime {
     private readonly updates = new UpdateService((title, body) => this.notifier.notify(title, body));
     private readonly tray = new TrayController(this.prompts, this.windows, this.updates);
     private readonly clipboard = new ClipboardImprover(this.prompts, this.providers, this.windows, this.settings);
-    private readonly dictation = new DictationController(this.settings, this.providers, this.windows, this.clipboard);
+    private readonly dictation = new DictationController(this.settings, this.prompts, this.providers, this.windows, this.clipboard);
 
     async start(): Promise<void> {
         await this.settings.initialize();
