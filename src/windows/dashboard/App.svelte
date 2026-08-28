@@ -935,10 +935,10 @@
 
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
-                                <label>Languages</label>
+                                <div id="dictate-languages-label">Languages</div>
                                 <span>Filled chips are used for dictation. Outline chips stay downloaded but idle. At least one stays on; at most {speechCatalog.maxActiveLanguages} can run at once.</span>
                             </div>
-                            <div class="language-chips">
+                            <div class="language-chips" role="group" aria-labelledby="dictate-languages-label">
                                 {#each settings.dictateDownloadedLanguages as code}
                                     <button
                                         type="button"
@@ -1006,10 +1006,10 @@
 
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
-                                <label>When finished</label>
+                                <div id="dictate-output-label">When finished</div>
                                 <span>Insert pastes into the app you were using. Copy only leaves the transcript on the clipboard.</span>
                             </div>
-                            <div class="output-mode">
+                            <div class="output-mode" role="group" aria-labelledby="dictate-output-label">
                                 <div class="output-mode__options">
                                     <button class:is-active={settings.dictateOutputMode === 'insert'} type="button" on:click={() => void handleDictateOutputModeChange('insert')}>Insert and copy</button>
                                     <button class:is-active={settings.dictateOutputMode === 'clipboard'} type="button" on:click={() => void handleDictateOutputModeChange('clipboard')}>Copy only</button>
