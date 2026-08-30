@@ -30,8 +30,19 @@ export function keyboardEventToAccelerator(event: KeyboardEvent): string | null 
     return parts.join('+');
 }
 
+const PRIMARY_MODIFIERS = new Set(['commandorcontrol', 'command', 'control', 'cmd', 'ctrl']);
+const EXTRA_MODIFIERS = new Set(['shift', 'alt', 'option']);
+
 export function isForbiddenDictateShortcut(accelerator: string): boolean {
-    return /^(commandorcontrol|command|control|cmd|ctrl)\+c$/i.test(accelerator.replace(/\s/g, ''));
+    const parts = accelerator.replace(/\s/g, '').split('+').filter(Boolean);
+    if (parts.length < 2) {
+        return false;
+    }
+
+    const mods = parts.slice(0, -1).map((part) => part.toLowerCase());
+    const hasPrimary = mods.some((mod) => PRIMARY_MODIFIERS.has(mod));
+    const hasExtra = mods.some((mod) => EXTRA_MODIFIERS.has(mod));
+    return hasPrimary && !hasExtra;
 }
 
 export function formatAcceleratorForDisplay(accelerator: string): string {

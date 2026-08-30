@@ -5,7 +5,7 @@
     import clipboard from 'tauri-plugin-clipboard-api';
     import { onMount } from 'svelte';
     import { SHELL_INSTALL_COMMANDS } from '../../config';
-    import { isForbiddenDictateShortcut, keyboardEventToAccelerator } from '../../platform/shortcut';
+    import { formatAcceleratorForDisplay, isForbiddenDictateShortcut, keyboardEventToAccelerator } from '../../platform/shortcut';
     import { APP_EVENTS, type DashboardOpenPayload, type WindowReadyPayload } from '../../app/events';
     import { AppStore } from '../../domain/store';
     import { PromptRepository } from '../../domain/prompt-repository';
@@ -407,7 +407,7 @@
 
     async function saveDictateShortcut(accelerator: string): Promise<void> {
         if (isForbiddenDictateShortcut(accelerator)) {
-            shortcutMessage = 'That shortcut would steal Copy. Pick another combination.';
+            shortcutMessage = 'Command or Control plus a single key is already a menu shortcut (Quit, Select All, Copy…). Add Shift or Alt.';
             shortcutIsError = true;
             return;
         }
@@ -1117,14 +1117,14 @@
                         <section class="provider-panel panel-card is-visible">
                             <div class="field-label">
                                 <label for="dictateShortcut">Dictate shortcut</label>
-                                <span>Hold to dictate, release to insert at the cursor and copy. A short tap opens the window; click Done to insert and copy. Needs Control/Command or Alt plus a key.</span>
+                                <span>Hold to dictate, release to insert at the cursor and copy. A short tap opens the window; click Done to insert and copy. Needs Control/Command or Alt plus a key. Command/Control combinations also need Shift or Alt — not ⌘Q, ⌘A, or ⌘C.</span>
                             </div>
                             <div class="field-row">
                                 <input
                                     id="dictateShortcut"
                                     type="text"
                                     readonly
-                                    value={recordingShortcut ? 'Press a shortcut…' : settings.dictateShortcut}
+                                    value={recordingShortcut ? 'Press a shortcut…' : formatAcceleratorForDisplay(settings.dictateShortcut)}
                                     on:click={startShortcutRecording}
                                 >
                                 <button class="app-button app-button--secondary" type="button" on:click={startShortcutRecording}>

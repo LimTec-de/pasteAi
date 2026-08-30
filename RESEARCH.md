@@ -11,6 +11,7 @@
 ## tauri-plugin-global-shortcut 2.3.2 — 2026-08-27
 - Handler `ShortcutEvent.state` is `Pressed` | `Released` (hold-to-talk). Docs: https://v2.tauri.app/plugin/global-shortcut/ https://v2.tauri.app/reference/javascript/global-shortcut/
 - Capabilities: `global-shortcut:allow-is-registered`, `allow-register`, `allow-unregister`. Register consumes the key (unlike passthrough Copy observer)
+- `CommandOrControl` → macOS `Modifiers::SUPER` (⌘), not ⌃. PC-keyboard Ctrl is `Control`. Cmd/Ctrl+key with no Shift/Alt is a menu/system shortcut (⌘Q Quit, ⌘A Select All, ⌘C Copy, ⌘Space Spotlight) — require a second modifier. https://github.com/tauri-apps/global-hotkey/blob/v0.8.0/src/hotkey.rs
 
 ## macOS Accessibility for paste — 2026-08-27
 - Cmd+V via `CGEvent` + `kCGHIDEventTap` needs Accessibility (post events), not Input Monitoring

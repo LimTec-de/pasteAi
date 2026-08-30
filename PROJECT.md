@@ -1,7 +1,7 @@
 # PROJECT
 
 ## Hold-to-dictate shortcut — 2026-08-27
-- Dedicated global shortcut (`dictateShortcut`, default `CommandOrControl+Shift+Space`). Hold = listen, release = clipboard + paste (`dictateOutputMode=insert` default) or copy only (`clipboard`). Short tap (<450ms) keeps overlay open with Done. Both insert flows write clipboard then Cmd/Ctrl+V. Second shortcut press also finishes (must run before `isBusy`). Never register Copy/C. Do not preview-commit while holding.
+- Dedicated global shortcut (`dictateShortcut`, default `CommandOrControl+Shift+Space`). Hold = listen, release = clipboard + paste (`dictateOutputMode=insert` default) or copy only (`clipboard`). Short tap (<450ms) keeps overlay open with Done. Both insert flows write clipboard then Cmd/Ctrl+V. Second shortcut press also finishes (must run before `isBusy`). Forbid Cmd/Ctrl+key with no Shift/Alt (Quit/Select All/Copy/Spotlight…). `CommandOrControl` on macOS is ⌘ only, not ⌃. Do not preview-commit while holding.
 - Overlay must not take focus (`showDictate` focus false + immediate `restore_frontmost_app`) or `Released` from tauri-plugin-global-shortcut 2.3.2 is unreliable. Size 380×360. Learn-from-copy hint in overlay (`dictate-learn`): correct after insert, copy once → Add/Skip toast; hide when overlay shows an error.
 - Overlay shows on press before engine ready (`DICTATE_SESSION` OpenAI `ek_`, `DICTATE_READY` Apple/local). OpenAI mic buffers PCM until WS open. Missing key / Apple unavailable / Parakeet not installed still open `providers`. No silent fallback.
 - `frontmost.rs`: remember macOS pid / Windows HWND; `paste_into_frontmost` restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it

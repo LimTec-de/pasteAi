@@ -12,6 +12,7 @@ import { getLocalSttStatus, preloadLocalStt } from '../domain/local-stt';
 import type { StatusType } from '../domain/types';
 import { transcriptionLanguages } from '../domain/types';
 import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords, transcriptionPrompt } from '../domain/dictate-dictionary';
+import { isForbiddenDictateShortcut } from '../platform/shortcut';
 import { AppWindows } from '../platform/windows';
 import { ClipboardImprover } from './clipboard-improver';
 
@@ -64,6 +65,15 @@ export class DictationController {
     private async registerFromSettings(): Promise<void> {
         const shortcut = (await this.settingsRepository.get('dictateShortcut')).trim()
             || CONFIG.DEFAULT_DICTATE_SHORTCUT;
+
+        if (isForbiddenDictateShortcut(shortcut)) {
+            await this.unregisterCurrent();
+            await this.showStatus(
+                'Command or Control plus a single key is already a menu shortcut. Add Shift or Alt under Dictation.',
+                'error'
+            );
+            return;
+        }
 
         if (this.registeredShortcut === shortcut) {
             return;
