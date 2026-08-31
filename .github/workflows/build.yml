@@ -33,11 +33,15 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils cmake ninja-build clang libclang-dev pkg-config
 
-      - name: install LLVM (windows)
+      - name: libclang for bindgen (windows)
         if: startsWith(matrix.platform, 'windows-')
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "18.1.8"
+        shell: pwsh
+        run: |
+          $dir = "C:\Program Files\LLVM\bin"
+          if (-not (Test-Path (Join-Path $dir "libclang.dll"))) {
+            throw "libclang.dll missing at $dir (windows-latest ships LLVM). bindgen needs LIBCLANG_PATH."
+          }
+          Add-Content -Path $env:GITHUB_ENV -Value "LIBCLANG_PATH=$dir"
 
       - name: Install pnpm and Node
         uses: pnpm/setup@v2

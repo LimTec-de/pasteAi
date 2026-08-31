@@ -32,4 +32,4 @@
 - `typescript` held at `^6.0.3` (svelte-check). `pnpm-workspace.yaml` `overrides.valibot: 1.4.2`; `minimumReleaseAgeExclude: openai@7.7.0`. Windows crate `0.62` (`frontmost.rs` HWND/SendInput).
 
 ## CI publish workflow — 2026-08-27
-- `.github/workflows/build.yml` runners: `macos-latest`, `ubuntu-latest`, `windows-latest`. `pnpm/setup@v2` (`runtime: node@24`, `packageManager` 11.24.0). `tauri-apps/tauri-action@v1` (`uploadUpdaterJson`). Linux glibc follows whatever `ubuntu-latest` is (currently 24.04). Windows: `scripts/windows-sherpa-md.ps1` before tauri-action.
+- `.github/workflows/build.yml` runners: `macos-latest`, `ubuntu-latest`, `windows-latest`. `pnpm/setup@v2` (`runtime: node@24`, `packageManager` 11.24.0). `tauri-apps/tauri-action@v1` (`uploadUpdaterJson`). Linux glibc follows whatever `ubuntu-latest` is (currently 24.04). Windows: `LIBCLANG_PATH=C:\Program Files\LLVM\bin` (image LLVM, no `install-llvm-action` — still Node 20); `scripts/windows-sherpa-md.ps1` before tauri-action.
