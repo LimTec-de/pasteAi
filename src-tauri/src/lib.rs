@@ -1,5 +1,6 @@
 mod apple;
 mod frontmost;
+mod local_llm;
 mod local_stt;
 
 use std::process::exit;
@@ -12,6 +13,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(frontmost::PreviousApp::default())
         .manage(local_stt::LocalSttState::default())
+        .manage(local_llm::LocalLlmState::default())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_autostart::init(
             MacosLauncher::LaunchAgent,
@@ -63,7 +65,12 @@ pub fn run() {
             local_stt::local_stt_status,
             local_stt::local_stt_install,
             local_stt::local_stt_preload,
-            local_stt::local_stt_transcribe
+            local_stt::local_stt_transcribe,
+            local_llm::local_llm_status,
+            local_llm::local_llm_install,
+            local_llm::local_llm_preload,
+            local_llm::local_llm_unload,
+            local_llm::local_llm_improve
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

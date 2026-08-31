@@ -26,6 +26,7 @@
     } from '../../domain/types';
     import { getAppleSpeechAvailability, getAppleTextAvailability, installSpeechLanguage, listAppleInputDevices, listSpeechLanguages, type AppleAvailability, type AudioInputDevice, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
     import { getLocalSttStatus, installLocalStt, type LocalSttStatus } from '../../domain/local-stt';
+    import { getLocalLlmStatus, installLocalLlm, LOCAL_LLM_RAM_HINT, type LocalLlmStatus } from '../../domain/local-llm';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -59,11 +60,18 @@
     let loginIsError = false;
     let pasteAILinkedEmail: string | null = null;
 
-    let ollamaAvailable = true;
-    let ollamaModels: string[] = [];
     let appleTextAvailability: AppleAvailability = UNAVAILABLE_ON_MAC;
     let appleSpeechAvailability: AppleAvailability = UNAVAILABLE_ON_MAC;
     let localSttStatus: LocalSttStatus = {
+        installed: false,
+        downloading: false,
+        phase: '',
+        loaded: false,
+        bytes: 0,
+        total: 0,
+        message: ''
+    };
+    let localLlmStatus: LocalLlmStatus = {
         installed: false,
         downloading: false,
         phase: '',
@@ -83,6 +91,7 @@
     let installingLanguage: string | null = null;
     let speechAssetPoll: ReturnType<typeof setInterval> | null = null;
     let localSttPoll: ReturnType<typeof setInterval> | null = null;
+    let localLlmPoll: ReturnType<typeof setInterval> | null = null;
     let vocabularyDraft = '';
     let ruleFromDraft = '';
     let ruleToDraft = '';
@@ -149,6 +158,7 @@
             void refreshProviderState();
             void refreshAppleAvailability();
             void refreshLocalSttStatus();
+            void refreshLocalLlmStatus();
         }
         if (section === 'dictation') {
             void refreshMicrophones();
@@ -190,6 +200,7 @@
         await refreshProviderState();
         await refreshAppleAvailability();
         await refreshLocalSttStatus();
+        await refreshLocalLlmStatus();
         await refreshSpeechLanguages();
     }
 
@@ -212,22 +223,12 @@
     async function refreshProviderState(): Promise<void> {
         if (settings.llmType === 'pasteai') {
             await loadPasteAIQuota();
-            ollamaAvailable = true;
-            ollamaModels = [];
             return;
         }
 
         quotaMessage = '';
         loginMessage = '';
         pasteAILinkedEmail = null;
-
-        if (settings.llmType === 'ollama') {
-            await refreshOllamaStatus();
-            return;
-        }
-
-        ollamaAvailable = true;
-        ollamaModels = [];
     }
 
     async function loadPasteAIQuota(): Promise<void> {
@@ -253,21 +254,6 @@
             console.error('Error checking quota:', error);
             quotaMessage = 'Error checking quota';
             quotaIsError = true;
-        }
-    }
-
-    async function refreshOllamaStatus(): Promise<void> {
-        ollamaAvailable = await providerGateway.checkOllamaAvailability(settings.ollamaUrl);
-        if (!ollamaAvailable) {
-            ollamaModels = [];
-            return;
-        }
-
-        ollamaModels = await providerGateway.fetchOllamaModels(settings.ollamaUrl);
-        if (settings.ollamaModel && !ollamaModels.includes(settings.ollamaModel)) {
-            settings = { ...settings, ollamaModel: '' };
-            await settingsRepository.update({ ollamaModel: '' });
-            await emitTo('main', APP_EVENTS.SETTINGS_CHANGED);
         }
     }
 
@@ -319,6 +305,9 @@
         }
 
         await updateSettings({ llmType: provider }, true);
+        if (provider === 'local' && !localLlmStatus.installed) {
+            void downloadLocalLlm();
+        }
     }
 
     async function handleDictationProviderSelect(provider: DictationProviderId): Promise<void> {
@@ -331,6 +320,58 @@
         if (provider === 'local' && !localSttStatus.installed) {
             void downloadLocalStt();
         }
+    }
+
+    async function refreshLocalLlmStatus(): Promise<void> {
+        try {
+            localLlmStatus = await getLocalLlmStatus();
+        } catch (error) {
+            console.error('Could not check local rewrite status:', error);
+            localLlmStatus = {
+                installed: false,
+                downloading: false,
+                phase: '',
+                loaded: false,
+                bytes: 0,
+                total: 0,
+                message: error instanceof Error ? error.message : 'Could not check local rewrite status.'
+            };
+        }
+        syncLocalLlmPoll();
+    }
+
+    async function downloadLocalLlm(): Promise<void> {
+        try {
+            await installLocalLlm();
+            await refreshLocalLlmStatus();
+        } catch (error) {
+            localLlmStatus = {
+                ...localLlmStatus,
+                downloading: false,
+                phase: '',
+                message: error instanceof Error ? error.message : 'Could not download rewrite model.'
+            };
+        }
+    }
+
+    function stopLocalLlmPoll(): void {
+        if (localLlmPoll !== null) {
+            clearInterval(localLlmPoll);
+            localLlmPoll = null;
+        }
+    }
+
+    function syncLocalLlmPoll(): void {
+        if (!localLlmStatus.downloading) {
+            stopLocalLlmPoll();
+            return;
+        }
+        if (localLlmPoll !== null) {
+            return;
+        }
+        localLlmPoll = setInterval(() => {
+            void refreshLocalLlmStatus();
+        }, 2000);
     }
 
     async function refreshLocalSttStatus(): Promise<void> {
@@ -387,14 +428,6 @@
 
     async function handleOpenAIKeyChange(): Promise<void> {
         await updateSettings({ openaiApiKey: settings.openaiApiKey });
-    }
-
-    async function handleOllamaUrlChange(): Promise<void> {
-        await updateSettings({ ollamaUrl: settings.ollamaUrl }, true);
-    }
-
-    async function handleOllamaModelChange(): Promise<void> {
-        await updateSettings({ ollamaModel: settings.ollamaModel });
     }
 
     async function handleShowStartToggle(): Promise<void> {
@@ -755,6 +788,7 @@
         let unlistenSettings: (() => void) | undefined;
 
         let unlistenLocalStt: (() => void) | undefined;
+        let unlistenLocalLlm: (() => void) | undefined;
 
         void (async () => {
             const currentWindow = Window.getCurrent();
@@ -769,6 +803,10 @@
             unlistenLocalStt = await listen<LocalSttStatus>('local-stt-status', (event) => {
                 localSttStatus = event.payload;
                 syncLocalSttPoll();
+            });
+            unlistenLocalLlm = await listen<LocalLlmStatus>('local-llm-status', (event) => {
+                localLlmStatus = event.payload;
+                syncLocalLlmPoll();
             });
             unlistenCloseRequested = await currentWindow.onCloseRequested(async (event) => {
                 event.preventDefault();
@@ -804,10 +842,12 @@
             unlistenFocus?.();
             unlistenSettings?.();
             unlistenLocalStt?.();
+            unlistenLocalLlm?.();
             window.removeEventListener('keydown', handleShortcutKeydown, true);
             navigator.mediaDevices?.removeEventListener('devicechange', handleDeviceChange);
             stopSpeechAssetPoll();
             stopLocalSttPoll();
+            stopLocalLlmPoll();
         };
     });
 </script>
@@ -907,7 +947,7 @@
                             </article>
                             <article class="callout-card start-callout">
                                 <h3>Keep it private</h3>
-                                <p>Switch to Apple Intelligence or Ollama to keep text improvements on this machine.</p>
+                                <p>Switch to Apple Intelligence or Local to keep text improvements on this machine.</p>
                             </article>
                             <article class="callout-card start-callout">
                                 <h3>Pick a style each time</h3>
@@ -940,13 +980,32 @@
                                 </div>
                                 <p>Bring your own API key when you want direct control over account billing and provider usage.</p>
                             </button>
-                            <button class:is-active={settings.llmType === 'ollama'} class="provider-card" type="button" on:click={() => void handleProviderSelect('ollama')}>
-                                <div class="provider-card__label">
-                                    <strong>Ollama</strong>
-                                    <span class="chip chip--muted">Local</span>
-                                </div>
-                                <p>Route text through a local model for offline or private improvement workflows.</p>
-                            </button>
+                            <div class="provider-card-wrap">
+                                <button class:is-active={settings.llmType === 'local'} class="provider-card" type="button" on:click={() => void handleProviderSelect('local')}>
+                                    <div class="provider-card__label">
+                                        <strong>Local</strong>
+                                        <span class="chip chip--muted">On-device</span>
+                                    </div>
+                                    <p>Qwen3-4B Instruct on this computer. Works on Windows, Linux, and Mac. One ~2.5 GB download, no API key. About 4 GB of RAM while loaded.</p>
+                                </button>
+                                {#if localLlmStatus.downloading}
+                                    <p class="provider-card__reason">
+                                        {#if localLlmStatus.phase === 'load'}
+                                            Loading rewrite model…
+                                        {:else if localLlmStatus.total > 0}
+                                            Downloading… {Math.min(100, Math.round((localLlmStatus.bytes / localLlmStatus.total) * 100))}%
+                                        {:else}
+                                            {localLlmStatus.message || 'Downloading rewrite model…'}
+                                        {/if}
+                                    </p>
+                                {:else if localLlmStatus.message}
+                                    <p class="provider-card__reason">{localLlmStatus.message}</p>
+                                {/if}
+                                <p class="provider-card__reason">{LOCAL_LLM_RAM_HINT}</p>
+                                {#if !localLlmStatus.installed && !localLlmStatus.downloading}
+                                    <button class="app-button app-button--secondary" type="button" on:click={() => void downloadLocalLlm()}>Download model</button>
+                                {/if}
+                            </div>
                             <div class="provider-card-wrap">
                                 <button
                                     class:is-active={settings.llmType === 'apple'}
@@ -1071,38 +1130,6 @@
                             </section>
                         {/if}
 
-                        {#if settings.llmType === 'ollama'}
-                            <section class="provider-stack">
-                                <section class="provider-panel panel-card is-visible">
-                                    <div class="field-label">
-                                        <label for="ollamaUrl">Ollama URL</label>
-                                        <span>Point pasteAI at the Ollama server you want to use.</span>
-                                    </div>
-                                    <input id="ollamaUrl" type="text" bind:value={settings.ollamaUrl} on:change={() => void handleOllamaUrlChange()}>
-
-                                    {#if !ollamaAvailable}
-                                        <div class="status is-visible status--error">Ollama is not reachable. Install it from <a href="https://ollama.com/download" target="_blank">ollama.com</a> or check the URL above.</div>
-                                    {/if}
-                                </section>
-
-                                <section class="provider-panel panel-card is-visible">
-                                    <div class="field-label">
-                                        <label for="ollamaModel">Ollama model</label>
-                                        <span>Choose one of the models currently available on the configured Ollama instance.</span>
-                                    </div>
-                                    <select id="ollamaModel" bind:value={settings.ollamaModel} on:change={() => void handleOllamaModelChange()}>
-                                        <option value="">{ollamaModels.length === 0 ? 'No models found' : 'Select a model'}</option>
-                                        {#each ollamaModels as model}
-                                            <option value={model}>{model}</option>
-                                        {/each}
-                                    </select>
-                                    <div class="status-note status-note--warning">
-                                        <div class="chip chip--muted">CLI</div>
-                                        <div>Install models in the terminal with commands like <code>ollama pull phi3:mini</code>.</div>
-                                    </div>
-                                </section>
-                            </section>
-                        {/if}
                     </div>
                 </section>
 
@@ -1565,8 +1592,8 @@
                             </article>
                             <article class="panel-card">
                                 <span class="section-kicker">Providers</span>
-                                <h3>PasteAI, OpenAI, Ollama, or Apple</h3>
-                                <p>A managed account, your own API key, a local model, or on-device Apple Intelligence.</p>
+                                <h3>PasteAI, OpenAI, Local, or Apple</h3>
+                                <p>A managed account, your own API key, an on-device Qwen3 model, or on-device Apple Intelligence.</p>
                             </article>
                         </div>
 
@@ -1576,6 +1603,7 @@
                             <a href="https://www.limtec.de/#imprint" class="app-button app-button--ghost" target="_blank">Imprint</a>
                             <a href="https://openai.com/policies/terms-of-use" class="app-button app-button--ghost" target="_blank">OpenAI terms</a>
                             <a href="https://huggingface.co/nvidia/parakeet-tdt-0.6b-v3" class="app-button app-button--ghost" target="_blank">Parakeet (CC BY 4.0)</a>
+                            <a href="https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507" class="app-button app-button--ghost" target="_blank">Qwen3 (Apache 2.0)</a>
                         </div>
                     </div>
                 </section>

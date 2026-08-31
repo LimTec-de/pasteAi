@@ -32,3 +32,14 @@ commands.allow = [
     "local_stt_preload",
     "local_stt_transcribe"
 ]
+
+[[permission]]
+identifier = "allow-local-llm"
+description = "On-device Qwen3 rewrite"
+commands.allow = [
+    "local_llm_status",
+    "local_llm_install",
+    "local_llm_preload",
+    "local_llm_unload",
+    "local_llm_improve"
+]

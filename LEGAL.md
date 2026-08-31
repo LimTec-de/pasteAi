@@ -25,7 +25,8 @@ PasteAI collects and processes:
 - API keys (stored locally)
 
 ### Data Processing
-- Text is processed through OpenAI's API, a local Ollama instance, or on-device Apple Intelligence
+- Text is processed through OpenAI's API, an on-device Qwen3 model, or on-device Apple Intelligence
+- On-device rewrite (Qwen3 via llama.cpp) keeps text on this computer
 - Dictation audio is sent to OpenAI's Realtime transcription API when OpenAI dictation is selected
 - On-device dictation (Apple Speech on Mac, or NVIDIA Parakeet via sherpa-onnx) keeps audio on this computer
 - No permanent storage of processed text
@@ -73,10 +74,12 @@ You can manage or delete cookies through your browser settings. Disabling essent
 - Users must comply with [OpenAI's Terms of Service](https://openai.com/policies/terms-of-use)
 - OpenAI's API usage is subject to their [Privacy Policy](https://openai.com/policies/privacy-policy)
 
-### Ollama (Local LLM)
-- Local processing option available through Ollama
-- No data sent to external services when using Ollama
-- Subject to [Ollama's License](https://github.com/ollama/ollama/blob/main/LICENSE)
+### Qwen3 (local rewrite)
+- Optional on-device rewrite model (Qwen3-4B-Instruct-2507 Q4_K_M GGUF) downloaded by the user
+- Text is processed locally via llama.cpp; it is not sent to Alibaba, Unsloth, or other cloud services
+- Model license: [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0). Attribution: Qwen3-4B-Instruct-2507, https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507
+- GGUF conversion: [unsloth/Qwen3-4B-Instruct-2507-GGUF](https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF)
+- Runtime: [llama.cpp](https://github.com/ggml-org/llama.cpp) (MIT) via [llama-cpp-2](https://crates.io/crates/llama-cpp-2)
 
 ### NVIDIA Parakeet (local dictation)
 - Optional on-device speech-to-text model (Parakeet TDT 0.6B v3) downloaded by the user

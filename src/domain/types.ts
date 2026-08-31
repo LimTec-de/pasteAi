@@ -1,4 +1,4 @@
-export type ProviderId = 'pasteai' | 'openai' | 'ollama' | 'apple';
+export type ProviderId = 'pasteai' | 'openai' | 'local' | 'apple';
 
 export type DictationProviderId = 'openai' | 'apple' | 'local';
 
@@ -20,8 +20,6 @@ export const FALLBACK_SPEECH_LANGUAGE_CODES = [
 export interface AppSettings {
     llmType: ProviderId;
     openaiApiKey: string;
-    ollamaUrl: string;
-    ollamaModel: string;
     defaultPromptId: number | null;
     appId: string;
     email: string;

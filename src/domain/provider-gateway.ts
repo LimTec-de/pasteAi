@@ -6,6 +6,12 @@ import type { AppSettings, PasteAIQuota } from './types';
 import { transcriptionLanguages } from './types';
 import { transcriptionKeywords, transcriptionPrompt } from './dictate-dictionary';
 import { improveWithApple } from './apple-system';
+import {
+    getLocalLlmStatus,
+    improveWithLocalLlm,
+    preloadLocalLlm,
+    unloadLocalLlm
+} from './local-llm';
 
 interface PasteAIErrorResponse {
     status: 'error';
@@ -37,7 +43,26 @@ export class ProviderGateway {
     ) {}
 
     async warmup(): Promise<void> {
-        this.syncOpenAIClient(await this.settingsRepository.getAll());
+        const settings = await this.settingsRepository.getAll();
+        this.syncOpenAIClient(settings);
+
+        if (settings.llmType === 'local') {
+            try {
+                const status = await getLocalLlmStatus();
+                if (status.installed) {
+                    await preloadLocalLlm();
+                }
+            } catch (error) {
+                console.error('Could not preload on-device rewrite model:', error);
+            }
+            return;
+        }
+
+        try {
+            await unloadLocalLlm();
+        } catch (error) {
+            console.error('Could not unload on-device rewrite model:', error);
+        }
     }
 
     async improve(text: string, systemPrompt: string): Promise<string> {
@@ -69,8 +94,8 @@ export class ProviderGateway {
                 return this.improveWithPasteAI(text, systemPrompt);
             case 'openai':
                 return this.improveWithOpenAI(text, systemPrompt, settings);
-            case 'ollama':
-                return this.improveWithOllama(text, systemPrompt, settings);
+            case 'local':
+                return improveWithLocalLlm(systemPrompt, text);
             case 'apple':
                 return improveWithApple(systemPrompt, text);
         }
@@ -98,31 +123,6 @@ export class ProviderGateway {
         }
 
         return data.data.message || 'Verification email sent';
-    }
-
-    async checkOllamaAvailability(url: string): Promise<boolean> {
-        try {
-            const response = await fetch(`${url}/api/version`);
-            return response.ok;
-        } catch (error) {
-            console.error('Error checking Ollama availability:', error);
-            return false;
-        }
-    }
-
-    async fetchOllamaModels(url: string): Promise<string[]> {
-        try {
-            const response = await fetch(`${url}/api/tags`);
-            if (!response.ok) {
-                return [];
-            }
-
-            const data = await response.json() as { models?: Array<{ name?: string }> };
-            return data.models?.map((model) => model.name).filter((name): name is string => !!name) ?? [];
-        } catch (error) {
-            console.error('Error fetching Ollama models:', error);
-            return [];
-        }
     }
 
     private async improveWithPasteAI(text: string, systemPrompt: string): Promise<string> {
@@ -217,34 +217,6 @@ export class ProviderGateway {
         }
 
         return data.value;
-    }
-
-    private async improveWithOllama(text: string, systemPrompt: string, settings: AppSettings): Promise<string> {
-        if (!settings.ollamaUrl.trim()) {
-            throw new Error('Ollama URL missing');
-        }
-
-        if (!settings.ollamaModel.trim()) {
-            throw new Error('Ollama model missing');
-        }
-
-        const response = await fetch(`${settings.ollamaUrl}/api/generate`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                model: settings.ollamaModel,
-                system: systemPrompt,
-                prompt: text,
-                stream: false
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`Ollama request failed with status ${response.status}`);
-        }
-
-        const data = await response.json() as { response?: string };
-        return data.response || text;
     }
 
     private syncOpenAIClient(settings: AppSettings): void {

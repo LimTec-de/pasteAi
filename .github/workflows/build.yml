@@ -31,7 +31,13 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf xdg-utils cmake ninja-build clang libclang-dev pkg-config
+
+      - name: install LLVM (windows)
+        if: startsWith(matrix.platform, 'windows-')
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "18.1.8"
 
       - name: Install pnpm and Node
         uses: pnpm/setup@v2

@@ -12,8 +12,6 @@ import {
 export const DEFAULT_SETTINGS: AppSettings = {
     llmType: 'pasteai',
     openaiApiKey: '',
-    ollamaUrl: 'http://localhost:11434',
-    ollamaModel: '',
     defaultPromptId: null,
     appId: '',
     email: '',
@@ -33,8 +31,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
 const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     llmType: 'llmType',
     openaiApiKey: 'openaiApiKey',
-    ollamaUrl: 'ollamaUrl',
-    ollamaModel: 'ollamaModel',
     defaultPromptId: 'defaultPromptId',
     appId: 'appId',
     email: 'email',
@@ -54,8 +50,6 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
 const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
     llmType: 'llm_type',
     openaiApiKey: 'openai_api_key',
-    ollamaUrl: 'ollama_url',
-    ollamaModel: 'ollama_model',
     defaultPromptId: 'defaultPromptId',
     appId: 'appId',
     email: 'email',
@@ -135,6 +129,7 @@ export class SettingsRepository {
 
     private async migrateLegacySettings(): Promise<void> {
         let hasChanges = await this.migrateLegacyDictateLanguage();
+        hasChanges = (await this.migrateOllamaSettings()) || hasChanges;
         const keys = Object.keys(DEFAULT_SETTINGS) as Array<keyof AppSettings>;
 
         for (const key of keys) {
@@ -168,7 +163,10 @@ export class SettingsRepository {
     private normalizeSetting<K extends keyof AppSettings>(key: K, value: unknown): AppSettings[K] {
         switch (key) {
             case 'llmType':
-                return (value === 'openai' || value === 'ollama' || value === 'pasteai' || value === 'apple'
+                if (value === 'ollama') {
+                    return 'local' as AppSettings[K];
+                }
+                return (value === 'openai' || value === 'local' || value === 'pasteai' || value === 'apple'
                     ? value
                     : DEFAULT_SETTINGS.llmType) as AppSettings[K];
             case 'dictationProvider':
@@ -205,8 +203,6 @@ export class SettingsRepository {
 
                 return (value === null ? null : DEFAULT_SETTINGS.dictatePromptId) as AppSettings[K];
             case 'openaiApiKey':
-            case 'ollamaUrl':
-            case 'ollamaModel':
             case 'appId':
             case 'email':
             case 'dictateShortcut':
@@ -237,6 +233,25 @@ export class SettingsRepository {
             default:
                 return DEFAULT_SETTINGS[key];
         }
+    }
+
+    private async migrateOllamaSettings(): Promise<boolean> {
+        const keys = ['ollamaUrl', 'ollamaModel', 'ollama_url', 'ollama_model'];
+        let hasChanges = false;
+        for (const key of keys) {
+            if (await this.store.has(key)) {
+                await this.store.delete(key);
+                hasChanges = true;
+            }
+        }
+
+        const llmType = await this.store.get<unknown>(SETTINGS_KEYS.llmType);
+        if (llmType === 'ollama') {
+            await this.store.set(SETTINGS_KEYS.llmType, 'local');
+            hasChanges = true;
+        }
+
+        return hasChanges;
     }
 
     private async migrateLegacyDictateLanguage(): Promise<boolean> {

@@ -15,6 +15,7 @@ import {
 import { PromptRepository } from '../domain/prompt-repository';
 import { ProviderGateway } from '../domain/provider-gateway';
 import { SettingsRepository } from '../domain/settings-repository';
+import { isLocalLlmMissing } from '../domain/local-llm';
 import type { DictionaryLearnPair, PromptOption, StatusType } from '../domain/types';
 import { AppWindows } from '../platform/windows';
 
@@ -288,6 +289,9 @@ export class ClipboardImprover {
                     { allowHtml: true }
                 );
             } else {
+                if (isLocalLlmMissing(error)) {
+                    await this.windows.openDashboard('providers');
+                }
                 await this.showStatus(
                     `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
                     'error'

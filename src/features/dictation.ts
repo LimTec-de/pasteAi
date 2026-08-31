@@ -9,6 +9,7 @@ import { PromptRepository } from '../domain/prompt-repository';
 import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import { getLocalSttStatus, preloadLocalStt } from '../domain/local-stt';
+import { isLocalLlmMissing } from '../domain/local-llm';
 import type { StatusType } from '../domain/types';
 import { transcriptionLanguages } from '../domain/types';
 import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords, transcriptionPrompt } from '../domain/dictate-dictionary';
@@ -364,6 +365,9 @@ export class DictationController {
                         { allowHtml: true }
                     );
                 } else {
+                    if (isLocalLlmMissing(error)) {
+                        await this.windows.openDashboard('providers');
+                    }
                     await this.showStatus(
                         `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
                         'error'

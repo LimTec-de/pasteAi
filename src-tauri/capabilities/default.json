@@ -62,6 +62,7 @@
     "allow-frontmost-app",
     "allow-apple-system",
     "allow-local-stt",
+    "allow-local-llm",
     "core:event:allow-listen",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",

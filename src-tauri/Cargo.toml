@@ -33,6 +33,9 @@ tauri-plugin-notification = "2"
 tauri-plugin-clipboard = "2"
 tauri-plugin-http = "2"
 sherpa-onnx = { version = "1.13.6", default-features = false }
+llama-cpp-2 = { version = "0.1.154", default-features = false, features = ["common"] }
+encoding_rs = "0.8"
+sha2 = "0.10"
 ureq = "3.4.0"
 tar = "0.4.46"
 bzip2 = "0.6.1"
