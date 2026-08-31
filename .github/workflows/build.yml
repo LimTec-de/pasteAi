@@ -55,6 +55,11 @@ jobs:
         with:
           workspaces: './src-tauri -> target'
 
+      - name: sherpa-onnx Windows MD CRT
+        if: startsWith(matrix.platform, 'windows-')
+        shell: pwsh
+        run: ./scripts/windows-sherpa-md.ps1
+
       - name: Install trusted-signing-cli
         run: cargo install trusted-signing-cli
 
