@@ -1,8 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
 
-export const LOCAL_LLM_RAM_HINT =
-    'About 4 GB of RAM while the model is loaded, plus a 2.5 GB download. Keep that much free. With Parakeet dictation at the same time, plan for about 5 GB.';
-
 export interface LocalLlmStatus {
     installed: boolean;
     downloading: boolean;

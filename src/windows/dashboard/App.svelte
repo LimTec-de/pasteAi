@@ -26,7 +26,7 @@
     } from '../../domain/types';
     import { getAppleSpeechAvailability, getAppleTextAvailability, installSpeechLanguage, listAppleInputDevices, listSpeechLanguages, type AppleAvailability, type AudioInputDevice, UNAVAILABLE_ON_MAC } from '../../domain/apple-system';
     import { getLocalSttStatus, installLocalStt, type LocalSttStatus } from '../../domain/local-stt';
-    import { getLocalLlmStatus, installLocalLlm, LOCAL_LLM_RAM_HINT, type LocalLlmStatus } from '../../domain/local-llm';
+    import { getLocalLlmStatus, installLocalLlm, type LocalLlmStatus } from '../../domain/local-llm';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
     const settingsRepository = new SettingsRepository(new AppStore());
@@ -986,7 +986,7 @@
                                         <strong>Local</strong>
                                         <span class="chip chip--muted">On-device</span>
                                     </div>
-                                    <p>Qwen3-4B Instruct on this computer. Works on Windows, Linux, and Mac. One ~2.5 GB download, no API key. About 4 GB of RAM while loaded.</p>
+                                    <p>Qwen3-4B Instruct on this computer. One ~2.5 GB download, no API key. About 4 GB of RAM while loaded.</p>
                                 </button>
                                 {#if localLlmStatus.downloading}
                                     <p class="provider-card__reason">
@@ -1001,7 +1001,6 @@
                                 {:else if localLlmStatus.message}
                                     <p class="provider-card__reason">{localLlmStatus.message}</p>
                                 {/if}
-                                <p class="provider-card__reason">{LOCAL_LLM_RAM_HINT}</p>
                                 {#if !localLlmStatus.installed && !localLlmStatus.downloading}
                                     <button class="app-button app-button--secondary" type="button" on:click={() => void downloadLocalLlm()}>Download model</button>
                                 {/if}
@@ -1030,7 +1029,7 @@
                         <div class="section-heading">
                             <span class="section-kicker">Dictation</span>
                             <h2>Choose how speech becomes text.</h2>
-                            <p>Independent from rewrite. Mac on-device uses Apple Speech. Parakeet is the offline engine for Windows, Linux, and Mac.</p>
+                            <p>Independent from rewrite.</p>
                         </div>
 
                         <div class="provider-grid">
@@ -1051,7 +1050,7 @@
                                     on:click={() => void handleDictationProviderSelect('apple')}
                                 >
                                     <div class="provider-card__label">
-                                        <strong>Mac (on-device)</strong>
+                                        <strong>Apple Speech</strong>
                                         <span class="chip chip--muted">On-device</span>
                                     </div>
                                     <p>Dictate with the speech model already on this Mac. No API key.</p>
@@ -1071,7 +1070,7 @@
                                         <strong>On-device (Parakeet)</strong>
                                         <span class="chip chip--muted">Local</span>
                                     </div>
-                                    <p>NVIDIA Parakeet TDT v3 on this computer. Works on Windows, Linux, and Mac. One ~660 MB download, no API key.</p>
+                                    <p>NVIDIA Parakeet TDT v3 on this computer. One ~660 MB download, no API key.</p>
                                 </button>
                                 {#if localSttStatus.downloading}
                                     <p class="provider-card__reason">
