@@ -884,9 +884,9 @@
                 <section bind:this={welcomeSectionElement} class:active={activeSection === 'welcome'} class="dashboard-section">
                     <div class="welcome">
                         <div class="welcome-hero fade-up">
-                            <span class="eyebrow">Clipboard utility</span>
-                            <h2 class="display-title">Three quick copies. Cleaner writing.</h2>
-                            <p class="lede">pasteAI stays out of your way until you ask for help. Select text, triple-copy, and get a polished version back in your clipboard without leaving the app you are already using.</p>
+                            <span class="eyebrow">How to use</span>
+                            <h2 class="display-title">Improve text, or speak it.</h2>
+                            <p class="lede">pasteAI has two separate functions. Rewrite selected text with three copies, or hold a shortcut and dictate at the cursor. Both stay in the background until you trigger them.</p>
                             <div class="start-actions">
                                 <button class="app-button app-button--primary" type="button" on:click={() => setActiveSection('providers')}>Set up a provider</button>
                                 <button class="app-button app-button--secondary" type="button" on:click={() => setActiveSection('prompts')}>Manage prompts</button>
@@ -897,28 +897,67 @@
                             </label>
                         </div>
 
-                        <div class="welcome-steps fade-up">
-                            <div class="welcome-step">
-                                <span class="welcome-step__num">1</span>
-                                <div>
-                                    <strong>Copy the text</strong>
-                                    <p>Select a sentence or paragraph and copy it like you normally would.</p>
+                        <div class="welcome-functions fade-up">
+                            <article class="welcome-function panel-card">
+                                <div class="section-heading">
+                                    <span class="section-kicker">Improve text</span>
+                                    <h3>Three copies. Cleaner writing.</h3>
+                                    <p>Select text in any app and copy it three times within one second. The improved version replaces your clipboard.</p>
                                 </div>
-                            </div>
-                            <div class="welcome-step">
-                                <span class="welcome-step__num">2</span>
-                                <div>
-                                    <strong>Repeat the copy</strong>
-                                    <p>Copy the same selection twice more to confirm you want pasteAI to step in.</p>
+                                <div class="welcome-steps welcome-steps--stack">
+                                    <div class="welcome-step">
+                                        <span class="welcome-step__num">1</span>
+                                        <div>
+                                            <strong>Copy the text</strong>
+                                            <p>Select a sentence or paragraph and copy it like you normally would.</p>
+                                        </div>
+                                    </div>
+                                    <div class="welcome-step">
+                                        <span class="welcome-step__num">2</span>
+                                        <div>
+                                            <strong>Repeat the copy</strong>
+                                            <p>Copy the same selection twice more so pasteAI knows to step in.</p>
+                                        </div>
+                                    </div>
+                                    <div class="welcome-step">
+                                        <span class="welcome-step__num">3</span>
+                                        <div>
+                                            <strong>Paste the result</strong>
+                                            <p>The improved text is on your clipboard, ready to paste anywhere.</p>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="welcome-step">
-                                <span class="welcome-step__num">3</span>
-                                <div>
-                                    <strong>Paste the result</strong>
-                                    <p>The improved text replaces your clipboard, ready to paste anywhere.</p>
+                            </article>
+                            <article class="welcome-function panel-card">
+                                <div class="section-heading">
+                                    <span class="section-kicker">Speech input</span>
+                                    <h3>Hold a shortcut and speak.</h3>
+                                    <p>Hold <code>{formatAcceleratorForDisplay(settings.dictateShortcut)}</code> in any app. Release to insert the cleaned-up transcript at the cursor and copy it.</p>
                                 </div>
-                            </div>
+                                <div class="welcome-steps welcome-steps--stack">
+                                    <div class="welcome-step">
+                                        <span class="welcome-step__num">1</span>
+                                        <div>
+                                            <strong>Hold the shortcut</strong>
+                                            <p>Press and hold <code>{formatAcceleratorForDisplay(settings.dictateShortcut)}</code>. A short tap keeps the window open instead.</p>
+                                        </div>
+                                    </div>
+                                    <div class="welcome-step">
+                                        <span class="welcome-step__num">2</span>
+                                        <div>
+                                            <strong>Speak</strong>
+                                            <p>Talk at a normal pace. Change the shortcut, language, and microphone under Dictation.</p>
+                                        </div>
+                                    </div>
+                                    <div class="welcome-step">
+                                        <span class="welcome-step__num">3</span>
+                                        <div>
+                                            <strong>Release to insert</strong>
+                                            <p>The transcript is cleaned up, copied, and pasted where you were typing. After a short tap, click Done.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </article>
                         </div>
 
                         <div class="welcome-shortcut panel-card fade-up">
@@ -942,12 +981,8 @@
 
                         <div class="welcome-tips fade-up">
                             <article class="callout-card start-callout">
-                                <h3>Dictate at the cursor</h3>
-                                <p>Hold the dictate shortcut (default {settings.dictateShortcut}) and speak. Release to insert the transcript where you were typing and copy it to the clipboard. A short tap keeps the window open — click Done when you are finished. Change the shortcut, language, microphone, and insert behavior under Dictation. Set the rewrite provider and dictation engine under AI Provider. On-device Mac options need macOS 26.</p>
-                            </article>
-                            <article class="callout-card start-callout">
                                 <h3>Keep it private</h3>
-                                <p>Switch to Apple Intelligence or Local to keep text improvements on this machine.</p>
+                                <p>Switch rewrite and dictation to Apple Intelligence or Local to keep work on this machine. On-device Mac options need macOS 26.</p>
                             </article>
                             <article class="callout-card start-callout">
                                 <h3>Pick a style each time</h3>

@@ -529,6 +529,42 @@
     max-width: 38rem;
 }
 
+.welcome-functions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.9rem;
+    align-items: start;
+}
+
+.welcome-function {
+    display: grid;
+    gap: 0.85rem;
+    align-content: start;
+    height: 100%;
+}
+
+.welcome-function .section-heading {
+    margin-bottom: 0;
+}
+
+.welcome-function h3 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 1.12rem;
+    font-weight: 650;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+}
+
+.welcome-function .section-heading code,
+.welcome-function .welcome-step code {
+    padding: 0.1rem 0.4rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    font-size: 0.82rem;
+}
+
 .start-actions {
     margin-top: 0.2rem;
 }
@@ -553,6 +589,11 @@
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 1.1rem;
+}
+
+.welcome-steps--stack {
+    grid-template-columns: 1fr;
+    gap: 0.85rem;
 }
 
 .welcome-step {
@@ -727,6 +768,7 @@
 
     .provider-grid,
     .prompt-workspace,
+    .welcome-functions,
     .welcome-steps,
     .welcome-tips,
     .about-meta {
