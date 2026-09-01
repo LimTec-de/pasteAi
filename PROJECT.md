@@ -14,6 +14,9 @@
 ## Post-dictation prompt — 2026-08-28
 - `dictatePromptId` (`null`=raw transcript, default `DEFAULT_DICTATE_PROMPT_ID=6` builtin `dictate-cleanup`). Missing id at speak → that builtin in memory, no store write. Settings open heals store if id gone. Ignore prompt `outputMode`; still `dictateOutputMode`. Improve before clipboard write. `deletePrompt` does not touch this key.
 
+## OpenAI rewrite — 2026-09-01
+- `llmType=openai`: Chat Completions `gpt-5.6-luna` + `reasoning_effort=none` (default is `medium`). Dictation STT stays `gpt-transcribe`.
+
 ## Improve working toast — 2026-09-01
 - Working status: CSS spinner + elapsed `Ns` (1s tick in status webview, not `STATUS_SHOW`). Hover `Currently improving`. Cancel X immediately; retry icon after 4s (`RETRY_VISIBLE_AFTER_MS`). `STATUS_ACTION` `cancel`/`retry`; generation guard drops late LLM result (no clipboard write). Clipboard cancel: original stays. Dictation cancel/error after STT: write raw+replacements then `dictateOutputMode` paste. Overlay cancel during listen still writes nothing. Retry re-runs same prompt/input; elapsed resets.
 

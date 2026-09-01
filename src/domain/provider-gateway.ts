@@ -160,7 +160,8 @@ export class ProviderGateway {
         }
 
         const completion = await this.openAIClient.chat.completions.create({
-            model: 'gpt-4o-mini',
+            model: 'gpt-5.6-luna',
+            reasoning_effort: 'none',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: text }
