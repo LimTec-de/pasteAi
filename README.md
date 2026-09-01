@@ -5,17 +5,26 @@ Select and copy text (Ctrl+C or ⌘+C) and then copy again and again within 1 se
 
 So basically you can use this app to make your text more readable by 3 times copying and pasting.
 
+You can also dictate: hold the shortcut (default ⌘⇧Space / Ctrl+Shift+Space), speak, release — the transcript is cleaned up and inserted. Rewrite and dictation work with OpenAI, Apple Intelligence (Mac, on-device), or a local model you download in Settings.
+
 ## Download
 
-💾 [Download the latest version for Mac, Windows and Linux](https://github.com/LimTec-de/pasteAi/releases/latest)
+**v0.14.13**
 
-⚠️ You can use some free tokens from our server. After this, you'll need to either purchase more tokens from [pasteai.app](https://pasteai.app) or provide your own OpenAI API key from [OpenAI's website](https://platform.openai.com/api-keys).
-Then open pasteAI settings via Tray Menu and paste your key.
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.13/pasteai_0.14.13_aarch64.dmg)
+[![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.13/pasteai_0.14.13_x64.dmg)
+[![Windows](https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.13/pasteai_0.14.13_x64-setup.exe)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.13/pasteai_0.14.13_amd64.AppImage)
+[![Debian](https://img.shields.io/badge/Debian-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.13/pasteai_0.14.13_amd64.deb)
+[![RPM](https://img.shields.io/badge/RPM-294172?style=for-the-badge&logo=redhat&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.13/pasteai-0.14.13-1.x86_64.rpm)
+
+⚠️ You can use some free tokens from our server. After this, buy more at [pasteai.app](https://pasteai.app), paste your own [OpenAI API key](https://platform.openai.com/api-keys) in Settings (Tray Menu), or switch to Apple Intelligence / a local model.
 
 ## Features
 
-- Automatically detects triple-copy clipboard operations
-- Optimizes text formatting instantly
+- Triple-copy clipboard rewrite
+- Hold-to-dictate (insert or copy)
+- OpenAI, Apple Intelligence, or local models
 - Runs silently in the background
 - Cross-platform support
 
@@ -51,10 +60,8 @@ Before building the application, ensure you have the following installed:
 
 1. Launch the application
 2. The app will run in the background
-3. To optimize text:
-   - Select and copy text (Ctrl+C or ⌘+C)
-   - Immediately copy again and again within 1 second (copy 3 times)
-   - The text in your clipboard will be automatically optimized
+3. To rewrite text: select and copy three times within 1 second (Ctrl+C or ⌘+C)
+4. To dictate: hold the shortcut, speak, release (or tap briefly, then Done)
 
 ## Development
 
