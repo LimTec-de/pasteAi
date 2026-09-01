@@ -43,18 +43,73 @@ body::after {
     font-weight: 800;
 }
 
+.status-toast__spinner {
+    width: 16px;
+    height: 16px;
+    border: 2.5px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: status-spin 0.75s linear infinite;
+}
+
+@keyframes status-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 .status-toast__body {
     display: grid;
     gap: 0.3rem;
     padding: 16px 18px 16px 8px;
 }
 
+.status-toast__header {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-height: 22px;
+}
+
 .status-toast__label {
+    flex: 1;
     font-size: 0.74rem;
     font-weight: 800;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--color-muted);
+}
+
+.status-toast__elapsed {
+    font-size: 0.74rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-muted);
+}
+
+.status-toast__controls {
+    display: flex;
+    align-items: center;
+    gap: 0.1rem;
+    margin-right: -4px;
+}
+
+.status-toast__icon-btn {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--color-muted);
+    cursor: pointer;
+}
+
+.status-toast__icon-btn:hover {
+    background: var(--color-bg-deep);
+    color: var(--color-text);
 }
 
 .status-toast__message {

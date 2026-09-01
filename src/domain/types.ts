@@ -133,6 +133,7 @@ export interface StatusDisplayPayload {
     type: StatusType;
     autohide?: boolean;
     allowHtml?: boolean;
+    cancellable?: boolean;
     pairs?: DictionaryLearnPair[];
     actions?: StatusAction[];
 }

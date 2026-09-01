@@ -56,7 +56,7 @@ export interface DictateSessionPayload {
 }
 
 export interface StatusActionPayload {
-    action: 'add' | 'skip';
+    action: 'add' | 'skip' | 'cancel' | 'retry';
 }
 
 export interface DictateCommitPayload {

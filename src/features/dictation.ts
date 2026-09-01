@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { register, unregister } from '@tauri-apps/plugin-global-shortcut';
 import clipboard from 'tauri-plugin-clipboard-api';
-import { APP_EVENTS, type DictateCommitPayload } from '../app/events';
+import { APP_EVENTS, type DictateCommitPayload, type StatusActionPayload } from '../app/events';
 import { CONFIG } from '../config';
 import { ProviderGateway } from '../domain/provider-gateway';
 import { PromptRepository } from '../domain/prompt-repository';
@@ -10,7 +10,7 @@ import { SettingsRepository } from '../domain/settings-repository';
 import { cancelAppleDictation, getAppleSpeechAvailability, startAppleDictation } from '../domain/apple-system';
 import { getLocalSttStatus, preloadLocalStt } from '../domain/local-stt';
 import { isLocalLlmMissing } from '../domain/local-llm';
-import type { StatusType } from '../domain/types';
+import type { DictateOutputMode, DictateReplacement, StatusType } from '../domain/types';
 import { transcriptionLanguages } from '../domain/types';
 import { applyReplacements, dictionaryPromptSuffix, transcriptionKeywords, transcriptionPrompt } from '../domain/dictate-dictionary';
 import { isForbiddenDictateShortcut } from '../platform/shortcut';
@@ -18,6 +18,13 @@ import { AppWindows } from '../platform/windows';
 import { ClipboardImprover } from './clipboard-improver';
 
 const TAP_MS = 450;
+
+interface PendingDictateImprove {
+    transcript: string;
+    systemPrompt: string;
+    replacements: DictateReplacement[];
+    outputMode: DictateOutputMode;
+}
 
 export class DictationController {
     private registeredShortcut: string | null = null;
@@ -27,6 +34,8 @@ export class DictationController {
     private cancelled = false;
     private pressAt = 0;
     private starting: Promise<void> | null = null;
+    private pendingImprove: PendingDictateImprove | null = null;
+    private improveGeneration = 0;
 
     constructor(
         private readonly settingsRepository: SettingsRepository,
@@ -42,6 +51,9 @@ export class DictationController {
         });
         await listen(APP_EVENTS.DICTATE_CANCEL, () => {
             void this.handleCancel();
+        });
+        await listen<StatusActionPayload>(APP_EVENTS.STATUS_ACTION, (event) => {
+            void this.handleImproveStatusAction(event.payload.action);
         });
         await this.registerFromSettings();
         await this.preloadLocalIfNeeded();
@@ -341,69 +353,169 @@ export class DictationController {
             return;
         }
 
-        let text = transcript;
         const settings = await this.settingsRepository.getAll();
         const prompt = await this.promptRepository.getDictatePrompt();
         if (prompt) {
-            try {
-                await this.showStatus('Improving...', 'working', { autohide: false });
-                const suffix = dictionaryPromptSuffix(settings.dictateVocabulary, settings.dictateReplacements);
-                const systemPrompt = suffix.length > 0 ? `${prompt.prompt}\n\n${suffix}` : prompt.prompt;
-                text = await this.providerGateway.improve(transcript, systemPrompt);
-            } catch (error) {
-                console.error('Could not improve dictation:', error);
-                this.clipboardImprover.endDictation();
-                await invoke('restore_frontmost_app').catch((restoreError) => {
-                    console.warn('Could not restore frontmost app:', restoreError);
-                });
-
-                const providerError = error as Error & { data?: { type?: string } };
-                if (providerError.data?.type === 'quota') {
-                    await this.showStatus(
-                        'No tokens left! <a href="https://pasteai.app/tokens.html" target="_blank">Click here to recharge</a>',
-                        'error',
-                        { allowHtml: true }
-                    );
-                } else {
-                    if (isLocalLlmMissing(error)) {
-                        await this.windows.openDashboard('providers');
-                    }
-                    await this.showStatus(
-                        `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
-                        'error'
-                    );
-                }
-                return;
-            }
+            const suffix = dictionaryPromptSuffix(settings.dictateVocabulary, settings.dictateReplacements);
+            this.pendingImprove = {
+                transcript,
+                systemPrompt: suffix.length > 0 ? `${prompt.prompt}\n\n${suffix}` : prompt.prompt,
+                replacements: settings.dictateReplacements,
+                outputMode: settings.dictateOutputMode
+            };
+            await this.runPendingImprove();
+            return;
         }
 
-        text = applyReplacements(text, settings.dictateReplacements);
+        const text = applyReplacements(transcript, settings.dictateReplacements);
+        await this.deliverDictation(text, settings.dictateOutputMode);
+    }
 
+    private async runPendingImprove(refreshStatus = true): Promise<void> {
+        const pending = this.pendingImprove;
+        if (!pending) {
+            return;
+        }
+
+        const generation = ++this.improveGeneration;
+        if (refreshStatus) {
+            await this.showStatus('Improving...', 'working', { autohide: false, cancellable: true });
+        }
+
+        try {
+            const improved = await this.providerGateway.improve(pending.transcript, pending.systemPrompt);
+            if (generation !== this.improveGeneration) {
+                return;
+            }
+
+            await this.deliverDictation(
+                applyReplacements(improved, pending.replacements),
+                pending.outputMode,
+                undefined,
+                generation
+            );
+        } catch (error) {
+            if (generation !== this.improveGeneration) {
+                return;
+            }
+
+            console.error('Could not improve dictation:', error);
+            await this.deliverDictation(
+                applyReplacements(pending.transcript, pending.replacements),
+                pending.outputMode,
+                error,
+                generation
+            );
+        }
+    }
+
+    private async handleImproveStatusAction(action: StatusActionPayload['action']): Promise<void> {
+        if (action === 'cancel') {
+            await this.cancelImprove();
+            return;
+        }
+
+        if (action === 'retry') {
+            await this.retryImprove();
+        }
+    }
+
+    private async cancelImprove(): Promise<void> {
+        const pending = this.pendingImprove;
+        if (!pending) {
+            return;
+        }
+
+        this.improveGeneration += 1;
+        const generation = this.improveGeneration;
+        await this.deliverDictation(
+            applyReplacements(pending.transcript, pending.replacements),
+            pending.outputMode,
+            undefined,
+            generation
+        );
+    }
+
+    private async retryImprove(): Promise<void> {
+        if (!this.pendingImprove) {
+            return;
+        }
+
+        await this.runPendingImprove(false);
+    }
+
+    private async deliverDictation(
+        text: string,
+        outputMode: DictateOutputMode,
+        improveError?: unknown,
+        generation?: number
+    ): Promise<void> {
+        if (generation !== undefined && generation !== this.improveGeneration) {
+            return;
+        }
+
+        this.pendingImprove = null;
         this.clipboardImprover.suppressNextWrite(text);
         await clipboard.writeText(text);
         this.clipboardImprover.armDictionaryLearn(text);
 
-        const outputMode = settings.dictateOutputMode;
-        if (outputMode === 'clipboard') {
+        if (outputMode === 'insert') {
+            try {
+                await invoke('paste_into_frontmost');
+            } catch (error) {
+                if (improveError !== undefined) {
+                    await this.showImproveError(improveError);
+                    this.clipboardImprover.enterWriteCooldown();
+                    return;
+                }
+
+                await this.showStatus(
+                    `Copied, but could not paste: ${error instanceof Error ? error.message : String(error)}`,
+                    'error'
+                );
+                this.clipboardImprover.enterWriteCooldown();
+                return;
+            }
+        } else {
             await invoke('restore_frontmost_app').catch((error) => {
                 console.warn('Could not restore frontmost app:', error);
             });
-            await this.showStatus('Copied', 'ok');
+        }
+
+        if (improveError !== undefined) {
+            await this.showImproveError(improveError);
             this.clipboardImprover.enterWriteCooldown();
             return;
         }
 
-        try {
-            await invoke('paste_into_frontmost');
+        if (outputMode === 'clipboard') {
+            await this.showStatus('Copied', 'ok');
+        } else {
             await this.showStatus('Inserted and copied', 'ok');
-        } catch (error) {
-            await this.showStatus(
-                `Copied, but could not paste: ${error instanceof Error ? error.message : String(error)}`,
-                'error'
-            );
         }
 
         this.clipboardImprover.enterWriteCooldown();
+    }
+
+    private async showImproveError(error: unknown): Promise<void> {
+        const providerError = error as Error & { data?: { type?: string } };
+        if (providerError.data?.type === 'quota') {
+            await this.showStatus(
+                'No tokens left! <a href="https://pasteai.app/tokens.html" target="_blank">Click here to recharge</a>',
+                'error',
+                { allowHtml: true }
+            );
+            return;
+        }
+
+        if (isLocalLlmMissing(error)) {
+            await this.windows.openDashboard('providers');
+        }
+
+        await this.showStatus(
+            `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
+            'error'
+        );
     }
 
     private async handleCancel(): Promise<void> {
@@ -422,13 +534,14 @@ export class DictationController {
     private async showStatus(
         message: string,
         type: StatusType,
-        options: { autohide?: boolean; allowHtml?: boolean } = {}
+        options: { autohide?: boolean; allowHtml?: boolean; cancellable?: boolean } = {}
     ): Promise<void> {
         await this.windows.showStatus({
             message,
             type,
             autohide: options.autohide,
-            allowHtml: options.allowHtml
+            allowHtml: options.allowHtml,
+            cancellable: options.cancellable
         });
     }
 }

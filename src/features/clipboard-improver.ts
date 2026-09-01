@@ -26,6 +26,12 @@ interface ImproveInput {
     html: string | null;
 }
 
+interface PendingImprove {
+    input: ImproveInput;
+    prompt: PromptOption;
+    useHtml: boolean;
+}
+
 type ClipboardRunState = 'idle' | 'awaitingPrompt' | 'improving' | 'applyingResult' | 'cooldown' | 'dictating';
 
 interface ClipboardState {
@@ -50,6 +56,8 @@ export class ClipboardImprover {
     };
     private learn: { text: string; at: number } | null = null;
     private pendingLearn: DictionaryLearnPair[] | null = null;
+    private pendingImprove: PendingImprove | null = null;
+    private improveGeneration = 0;
 
     constructor(
         private readonly promptRepository: PromptRepository,
@@ -262,48 +270,114 @@ export class ClipboardImprover {
                 return;
             }
 
-            const useHtml = await this.shouldImproveAsHtml(input, selectedPrompt);
-
-            this.state.runState = 'improving';
-            await this.showStatus('Improving sentence...', 'working', {
-                autohide: false
-            });
-
-            if (useHtml && input.html) {
-                const improvedHtml = await this.providerGateway.improveHtml(input.html, selectedPrompt.prompt);
-                await this.applyHtmlResult(improvedHtml);
-                return;
-            }
-
-            const sourceText = input.html ? htmlToImprovableText(input.html) : input.text;
-            const improvedText = await this.providerGateway.improve(sourceText, selectedPrompt.prompt);
-            await this.applyResult(selectedPrompt, improvedText);
+            this.pendingImprove = {
+                input,
+                prompt: selectedPrompt,
+                useHtml: await this.shouldImproveAsHtml(input, selectedPrompt)
+            };
+            await this.runPendingImprove();
         } catch (error) {
             console.error('Error improving sentence:', error);
-
-            const providerError = error as Error & { data?: { type?: string } };
-            if (providerError.data?.type === 'quota') {
-                await this.showStatus(
-                    'No tokens left! <a href="https://pasteai.app/tokens.html" target="_blank">Click here to recharge</a>',
-                    'error',
-                    { allowHtml: true }
-                );
-            } else {
-                if (isLocalLlmMissing(error)) {
-                    await this.windows.openDashboard('providers');
-                }
-                await this.showStatus(
-                    `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
-                    'error'
-                );
-            }
-
+            this.pendingImprove = null;
+            await this.showImproveError(error);
             this.resetRunState();
         }
     }
 
-    private async applyResult(prompt: PromptOption, improvedText: string): Promise<void> {
+    private async runPendingImprove(refreshStatus = true): Promise<void> {
+        const pending = this.pendingImprove;
+        if (!pending) {
+            return;
+        }
+
+        const generation = ++this.improveGeneration;
+        this.state.runState = 'improving';
+        if (refreshStatus) {
+            await this.showStatus('Improving sentence...', 'working', {
+                autohide: false,
+                cancellable: true
+            });
+        }
+
+        try {
+            if (pending.useHtml && pending.input.html) {
+                const improvedHtml = await this.providerGateway.improveHtml(pending.input.html, pending.prompt.prompt);
+                if (generation !== this.improveGeneration) {
+                    return;
+                }
+
+                await this.applyHtmlResult(improvedHtml, generation);
+                return;
+            }
+
+            const sourceText = pending.input.html
+                ? htmlToImprovableText(pending.input.html)
+                : pending.input.text;
+            const improvedText = await this.providerGateway.improve(sourceText, pending.prompt.prompt);
+            if (generation !== this.improveGeneration) {
+                return;
+            }
+
+            await this.applyResult(pending.prompt, improvedText, generation);
+        } catch (error) {
+            if (generation !== this.improveGeneration) {
+                return;
+            }
+
+            console.error('Error improving sentence:', error);
+            this.pendingImprove = null;
+            await this.showImproveError(error);
+            this.resetRunState();
+        }
+    }
+
+    private async cancelImprove(): Promise<void> {
+        if (this.state.runState !== 'improving') {
+            return;
+        }
+
+        this.improveGeneration += 1;
+        this.pendingImprove = null;
+        await this.windows.hideStatus();
+        this.resetRunState();
+    }
+
+    private async retryImprove(): Promise<void> {
+        if (this.state.runState !== 'improving' || !this.pendingImprove) {
+            return;
+        }
+
+        await this.runPendingImprove(false);
+    }
+
+    private async showImproveError(error: unknown): Promise<void> {
+        const providerError = error as Error & { data?: { type?: string } };
+        if (providerError.data?.type === 'quota') {
+            await this.showStatus(
+                'No tokens left! <a href="https://pasteai.app/tokens.html" target="_blank">Click here to recharge</a>',
+                'error',
+                { allowHtml: true }
+            );
+            return;
+        }
+
+        if (isLocalLlmMissing(error)) {
+            await this.windows.openDashboard('providers');
+        }
+
+        await this.showStatus(
+            `Could not improve sentence, please check your settings: ${error instanceof Error ? error.message : String(error)}`,
+            'error'
+        );
+    }
+
+    private async applyResult(prompt: PromptOption, improvedText: string, generation: number): Promise<void> {
+        if (generation !== this.improveGeneration) {
+            return;
+        }
+
         if (prompt.outputMode === 'window') {
+            this.pendingImprove = null;
             await this.windows.hideStatus();
             this.resetRunState();
             void this.windows.showAnswer(improvedText).catch((error) => {
@@ -312,6 +386,11 @@ export class ClipboardImprover {
             return;
         }
 
+        if (generation !== this.improveGeneration) {
+            return;
+        }
+
+        this.pendingImprove = null;
         this.state.runState = 'applyingResult';
         this.state.suppressedClipboardText = improvedText;
         await clipboard.writeText(improvedText);
@@ -331,9 +410,18 @@ export class ClipboardImprover {
         return this.settingsRepository.get('improveHtml');
     }
 
-    private async applyHtmlResult(improvedHtml: string): Promise<void> {
+    private async applyHtmlResult(improvedHtml: string, generation: number): Promise<void> {
+        if (generation !== this.improveGeneration) {
+            return;
+        }
+
         const plainText = htmlToImprovableText(improvedHtml);
 
+        if (generation !== this.improveGeneration) {
+            return;
+        }
+
+        this.pendingImprove = null;
         this.state.runState = 'applyingResult';
         this.state.suppressedClipboardText = plainText;
         await clipboard.writeHtmlAndText(improvedHtml, plainText);
@@ -364,6 +452,7 @@ export class ClipboardImprover {
         this.state.isOldCopy = true;
         this.state.lastUpdateTime = 0;
         this.state.suppressedClipboardText = null;
+        this.pendingImprove = null;
 
         if (this.state.cooldownTimeout !== null) {
             window.clearTimeout(this.state.cooldownTimeout);
@@ -409,7 +498,17 @@ export class ClipboardImprover {
         return true;
     }
 
-    private async handleStatusAction(action: 'add' | 'skip'): Promise<void> {
+    private async handleStatusAction(action: StatusActionPayload['action']): Promise<void> {
+        if (action === 'cancel') {
+            await this.cancelImprove();
+            return;
+        }
+
+        if (action === 'retry') {
+            await this.retryImprove();
+            return;
+        }
+
         const pairs = this.pendingLearn;
         this.pendingLearn = null;
         await this.windows.hideStatus();
@@ -442,12 +541,17 @@ export class ClipboardImprover {
         await this.showStatus('Dictionary updated', 'ok');
     }
 
-    private async showStatus(message: string, type: StatusType, options: { autohide?: boolean; allowHtml?: boolean } = {}): Promise<void> {
+    private async showStatus(
+        message: string,
+        type: StatusType,
+        options: { autohide?: boolean; allowHtml?: boolean; cancellable?: boolean } = {}
+    ): Promise<void> {
         await this.windows.showStatus({
             message,
             type,
             autohide: options.autohide,
-            allowHtml: options.allowHtml
+            allowHtml: options.allowHtml,
+            cancellable: options.cancellable
         });
     }
 }
