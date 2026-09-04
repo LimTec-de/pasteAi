@@ -1,7 +1,7 @@
 {
   "name": "pasteai",
   "private": true,
-  "version": "0.14.13",
+  "version": "0.14.14",
   "packageManager": "pnpm@11.24.0",
   "type": "module",
   "scripts": {
