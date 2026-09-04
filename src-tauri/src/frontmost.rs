@@ -293,13 +293,14 @@ mod macos {
 #[cfg(target_os = "windows")]
 mod windows_front {
     use windows::Win32::Foundation::HWND;
+    use windows::Win32::System::Threading::AttachThreadInput;
     use windows::Win32::UI::Input::KeyboardAndMouse::{
         SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
         VK_CONTROL,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        AttachThreadInput, BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId,
-        SetForegroundWindow, ShowWindow, SW_RESTORE,
+        BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId, SetForegroundWindow,
+        ShowWindow, SW_RESTORE,
     };
 
     const VK_V: VIRTUAL_KEY = VIRTUAL_KEY(0x56);
@@ -368,6 +369,7 @@ mod linux_front {
     use x11rb::connection::Connection;
     use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask};
     use x11rb::rust_connection::RustConnection;
+    use x11rb::wrapper::ConnectionExt as _;
 
     pub fn post_paste() -> Result<(), String> {
         let mut enigo = Enigo::new(&Settings::default()).map_err(|error| error.to_string())?;
@@ -415,10 +417,7 @@ mod linux_front {
         ) else {
             return;
         };
-        let _ = conn.flush();
-        if let Ok(cookie) = conn.get_input_focus() {
-            let _ = cookie.reply();
-        }
+        let _ = conn.sync();
     }
 
     fn intern_active_window(conn: &RustConnection) -> Option<u32> {
