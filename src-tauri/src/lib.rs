@@ -51,6 +51,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             frontmost::remember_frontmost_app,
             frontmost::restore_frontmost_app,
+            frontmost::activate_this_app,
             frontmost::paste_into_frontmost,
             frontmost::open_accessibility_settings,
             apple::apple_text_availability,

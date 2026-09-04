@@ -43,14 +43,16 @@ export class TrayController {
     private async createMenu(isAutoStartEnabled: boolean): Promise<Menu> {
         const prompts = await this.promptRepository.getAllPrompts();
         const defaultPromptId = await this.promptRepository.getDefaultPromptId();
+        const askEveryTime = await this.promptRepository.getAskEveryTime();
+        const chooseEveryTime = await this.promptRepository.shouldAskEveryTime();
 
         const promptItems = [
             await CheckMenuItem.new({
                 id: 'choose_every_time',
                 text: 'Choose every time',
-                checked: defaultPromptId === null,
+                checked: chooseEveryTime,
                 action: async () => {
-                    await this.promptRepository.setDefaultPromptId(null);
+                    await this.promptRepository.setAskEveryTime(!askEveryTime);
                     await this.windows.prewarmPromptWindow();
                     await this.refreshMenu();
                 }

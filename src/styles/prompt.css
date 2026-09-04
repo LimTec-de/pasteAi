@@ -7,7 +7,7 @@
     list-style: none;
     display: grid;
     gap: 0.8rem;
-    max-height: 420px;
+    max-height: 320px;
     margin: 0;
     padding: 0;
     overflow-y: auto;
@@ -31,7 +31,8 @@
         border-color var(--transition-standard);
 }
 
-.prompt-item:hover {
+.prompt-item:hover,
+.prompt-item.is-selected {
     border-color: var(--color-accent);
     background: var(--color-accent-soft);
 }
@@ -56,6 +57,39 @@
     gap: 0.8rem;
 }
 
+.prompt-shell__actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    flex-shrink: 0;
+}
+
+.prompt-shell__shortcut {
+    padding: 0.08rem 0.35rem;
+    border-radius: 5px;
+    border: 1px solid currentColor;
+    font: inherit;
+    font-size: 0.72em;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    opacity: 0.75;
+}
+
+.prompt-shell__extra {
+    display: grid;
+    gap: 0.35rem;
+}
+
+.prompt-shell__extra-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--color-muted);
+}
+
+.prompt-shell--extra {
+    gap: 1rem;
+}
+
 .prompt-shell__status {
     min-height: 1.5rem;
     color: var(--color-muted);
@@ -74,5 +108,9 @@
     .prompt-shell__footer {
         grid-template-columns: 1fr;
         display: grid;
+    }
+
+    .prompt-shell__actions {
+        justify-content: end;
     }
 }

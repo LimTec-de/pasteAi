@@ -2,6 +2,7 @@ import type {
     DashboardSection,
     DictateOutputMode,
     ManagedWindowId,
+    PromptChoice,
     PromptOption,
     StatusDisplayPayload
 } from '../domain/types';
@@ -36,6 +37,13 @@ export interface DashboardOpenPayload {
     section: DashboardSection;
 }
 
+export type PromptPickerMode = 'full' | 'extra';
+
+export interface PromptOpenPayload {
+    mode: PromptPickerMode;
+    preselected?: PromptOption;
+}
+
 export interface AnswerDisplayPayload {
     text: string;
 }
@@ -67,8 +75,8 @@ export interface DictateCommitPayload {
 export interface AppEventPayloads {
     [APP_EVENTS.WINDOW_READY]: WindowReadyPayload;
     [APP_EVENTS.DASHBOARD_OPEN]: DashboardOpenPayload;
-    [APP_EVENTS.PROMPT_OPEN]: undefined;
-    [APP_EVENTS.PROMPT_SELECTED]: PromptOption;
+    [APP_EVENTS.PROMPT_OPEN]: PromptOpenPayload;
+    [APP_EVENTS.PROMPT_SELECTED]: PromptChoice;
     [APP_EVENTS.PROMPT_CANCELLED]: undefined;
     [APP_EVENTS.STATUS_SHOW]: StatusDisplayPayload;
     [APP_EVENTS.STATUS_HIDE]: undefined;

@@ -73,3 +73,9 @@
 - `gpt-5.6-luna`: nano-tier of GPT-5.6, $0.20/$1.20, chat_completions+responses, default `reasoning.effort=medium`, supports `none`. Official Speed=Fast. openai 7.7.0 types include `'none'`. https://developers.openai.com/api/docs/models/gpt-5.6-luna
 - `gpt-5.4-nano`: $0.20/$1.25, default `reasoning.effort=none`, Speed=Fast. https://developers.openai.com/api/docs/models/gpt-5.4-nano
 - Latency at `effort=none` (Artificial Analysis, OpenAI API): TTFT both ~0.75s; output 5.4-nano ~176 t/s vs Luna ~125 t/s. Default Luna (medium) is much slower than default nano. For short clipboard rewrite: set Luna `reasoning_effort: "none"`. https://artificialanalysis.ai/models/comparisons/gpt-5-6-luna-non-reasoning-vs-gpt-5-4-nano-non-reasoning
+
+## Focus restore other apps — 2026-09-02
+- Linux X11: read/restore via EWMH `_NET_ACTIVE_WINDOW` on root; restore = ClientMessage to root (`source=1`) with `SubstructureRedirect|SubstructureNotify`. Do not `XSetInputFocus`. `x11rb` 0.14.0. https://specifications.freedesktop.org/wm-spec/latest/ar01s03.html#id-1.4.7 https://crates.io/crates/x11rb
+- Wayland: no protocol to activate another client's surface; hiding our window returns compositor focus. Skip remember when `WAYLAND_DISPLAY` set and `DISPLAY` unset.
+- Windows `SetForegroundWindow` often fails (foreground lock). AttachThreadInput(fg thread, target thread) then SetForegroundWindow. `windows` 0.62 `Win32_UI_WindowsAndMessaging`. https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-setforegroundwindow
+- macOS 14+: `NSApplicationActivateIgnoringOtherApps` deprecated/no-op; `NSApp.activate` is cooperative. Still call both plus `NSRunningApplication.currentApplication.activateWithOptions` for older OS. Accessory policy stays. https://developer.apple.com/documentation/appkit/nsapplication/activate()

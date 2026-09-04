@@ -781,6 +781,17 @@
         await emitTo('main', APP_EVENTS.PROMPTS_CHANGED);
     }
 
+    async function handleAskForContextChange(event: Event): Promise<void> {
+        if (!selectedPrompt) {
+            return;
+        }
+
+        const target = event.currentTarget as HTMLInputElement;
+        await promptRepository.setAskForContext(selectedPrompt.id, target.checked);
+        await refreshPromptState(selectedPrompt.id);
+        await emitTo('main', APP_EVENTS.PROMPTS_CHANGED);
+    }
+
     onMount(() => {
         let unlistenOpen: (() => void) | undefined;
         let unlistenCloseRequested: (() => void) | undefined;
@@ -1434,6 +1445,10 @@
                                                         <button class:is-active={selectedPrompt.outputMode === 'window'} type="button" on:click={() => void handleOutputModeChange('window')}>Show window</button>
                                                     </div>
                                                 </div>
+                                                <label class="start-toggle">
+                                                    <input type="checkbox" checked={selectedPrompt.askForContext} on:change={(event) => void handleAskForContextChange(event)}>
+                                                    <span>Ask for extra instruction each time. Shows a small input when this prompt runs without the full picker.</span>
+                                                </label>
                                                 <div class="prompt-preview__actions">
                                                     {#if !selectedPromptIsDefault}
                                                         <button class="app-button app-button--primary" type="button" on:click={() => void setDefaultPrompt()}>Set as default</button>
@@ -1476,6 +1491,10 @@
                                                         <button class:is-active={selectedPrompt.outputMode === 'window'} type="button" on:click={() => void handleOutputModeChange('window')}>Show window</button>
                                                     </div>
                                                 </div>
+                                                <label class="start-toggle">
+                                                    <input type="checkbox" checked={selectedPrompt.askForContext} on:change={(event) => void handleAskForContextChange(event)}>
+                                                    <span>Ask for extra instruction each time. Shows a small input when this prompt runs without the full picker.</span>
+                                                </label>
                                                 {#if inlineEditError}
                                                     <div class="status is-visible status--error">{inlineEditError}</div>
                                                 {/if}

@@ -1,7 +1,16 @@
 import { DEFAULT_DICTATE_PROMPT_ID, type PromptOption, type PromptOutputMode } from './types';
 import { SettingsRepository } from './settings-repository';
 
-export const DEFAULT_PROMPTS: PromptOption[] = [
+export function composeImprovePrompt(base: string, extra: string): string {
+    const trimmed = extra.trim();
+    if (!trimmed) {
+        return base;
+    }
+
+    return `${base}\n\nAdditional instruction from the user (this takes priority for this request):\n${trimmed}`;
+}
+
+export const DEFAULT_PROMPTS: Array<Omit<PromptOption, 'askForContext'>> = [
     {
         id: 0,
         identifier: 'grammar',
@@ -55,6 +64,7 @@ export const DEFAULT_PROMPTS: PromptOption[] = [
 
 const PROMPTS_KEY = 'prompts';
 const BUILTIN_OUTPUT_MODES_KEY = 'builtinOutputModes';
+const BUILTIN_ASK_FOR_CONTEXT_KEY = 'builtinAskForContext';
 const USER_PROMPT_ID_START = 1000;
 
 interface StoredPrompt {
@@ -63,6 +73,7 @@ interface StoredPrompt {
     prompt: string;
     identifier?: unknown;
     outputMode?: unknown;
+    askForContext?: unknown;
 }
 
 export class PromptRepository {
@@ -81,9 +92,11 @@ export class PromptRepository {
 
     async getAllPrompts(): Promise<PromptOption[]> {
         const builtinModes = await this.getBuiltinOutputModes();
+        const builtinAsk = await this.getBuiltinAskForContext();
         const builtins = DEFAULT_PROMPTS.map((prompt) => ({
             ...prompt,
-            outputMode: builtinModes[prompt.id] ?? prompt.outputMode
+            outputMode: builtinModes[prompt.id] ?? prompt.outputMode,
+            askForContext: builtinAsk[prompt.id] === true
         }));
         const userPrompts = await this.getUserPrompts();
         return [...builtins, ...userPrompts];
@@ -107,7 +120,14 @@ export class PromptRepository {
 
         const finalIdentifier = await this.resolveIdentifier(identifier, title, newId);
 
-        userPrompts.push({ id: newId, title, prompt, identifier: finalIdentifier, outputMode });
+        userPrompts.push({
+            id: newId,
+            title,
+            prompt,
+            identifier: finalIdentifier,
+            outputMode,
+            askForContext: false
+        });
         await this.setPrompts(userPrompts);
     }
 
@@ -120,7 +140,9 @@ export class PromptRepository {
 
         const prompts = await this.getUserPrompts();
         await this.setPrompts(prompts.map((entry) => (
-            entry.id === id ? { ...entry, title, prompt, identifier: finalIdentifier, outputMode } : entry
+            entry.id === id
+                ? { ...entry, title, prompt, identifier: finalIdentifier, outputMode }
+                : entry
         )));
     }
 
@@ -149,6 +171,31 @@ export class PromptRepository {
         )));
     }
 
+    async setAskForContext(id: number, askForContext: boolean): Promise<void> {
+        if (id < USER_PROMPT_ID_START) {
+            const builtinAsk = await this.getBuiltinAskForContext();
+            const builtin = DEFAULT_PROMPTS.find((entry) => entry.id === id);
+            if (!builtin) {
+                return;
+            }
+
+            if (!askForContext) {
+                delete builtinAsk[id];
+            } else {
+                builtinAsk[id] = true;
+            }
+
+            await this.settingsRepository.setRawValue(BUILTIN_ASK_FOR_CONTEXT_KEY, builtinAsk);
+            await this.settingsRepository.saveRawChanges();
+            return;
+        }
+
+        const prompts = await this.getUserPrompts();
+        await this.setPrompts(prompts.map((entry) => (
+            entry.id === id ? { ...entry, askForContext } : entry
+        )));
+    }
+
     async deletePrompt(id: number): Promise<void> {
         if (id < USER_PROMPT_ID_START) {
             return;
@@ -159,7 +206,7 @@ export class PromptRepository {
 
         const defaultPromptId = await this.getDefaultPromptId();
         if (defaultPromptId === id) {
-            await this.settingsRepository.update({ defaultPromptId: null });
+            await this.settingsRepository.update({ defaultPromptId: null, askEveryTime: true });
         } else {
             await this.settingsRepository.saveRawChanges();
         }
@@ -173,6 +220,22 @@ export class PromptRepository {
         await this.settingsRepository.update({ defaultPromptId: id });
     }
 
+    async getAskEveryTime(): Promise<boolean> {
+        return this.settingsRepository.get('askEveryTime');
+    }
+
+    async setAskEveryTime(ask: boolean): Promise<void> {
+        if (!ask && await this.getDefaultPromptId() === null) {
+            ask = true;
+        }
+
+        await this.settingsRepository.update({ askEveryTime: ask });
+    }
+
+    async shouldAskEveryTime(): Promise<boolean> {
+        return await this.getAskEveryTime() || await this.getDefaultPrompt() === null;
+    }
+
     async getDefaultPrompt(): Promise<PromptOption | null> {
         const defaultPromptId = await this.getDefaultPromptId();
         if (defaultPromptId === null) {
@@ -183,7 +246,7 @@ export class PromptRepository {
         const prompt = prompts.find((entry) => entry.id === defaultPromptId) ?? null;
 
         if (!prompt) {
-            await this.setDefaultPromptId(null);
+            await this.settingsRepository.update({ defaultPromptId: null, askEveryTime: true });
         }
 
         return prompt;
@@ -229,6 +292,23 @@ export class PromptRepository {
         return result;
     }
 
+    private async getBuiltinAskForContext(): Promise<Record<number, boolean>> {
+        const stored = await this.settingsRepository.getRawValue<Record<string, unknown>>(BUILTIN_ASK_FOR_CONTEXT_KEY);
+        if (typeof stored !== 'object' || stored === null) {
+            return {};
+        }
+
+        const result: Record<number, boolean> = {};
+        for (const [key, value] of Object.entries(stored)) {
+            const id = Number.parseInt(key, 10);
+            if (Number.isFinite(id) && value === true) {
+                result[id] = true;
+            }
+        }
+
+        return result;
+    }
+
     private async backfillPrompts(storedPrompts: StoredPrompt[]): Promise<void> {
         const needsBackfill = storedPrompts.some((entry) => (
             this.isValidStoredPrompt(entry)
@@ -258,7 +338,14 @@ export class PromptRepository {
                 }
 
                 const outputMode: PromptOutputMode = entry.outputMode === 'window' ? 'window' : 'clipboard';
-                return { id: entry.id, title: entry.title, prompt: entry.prompt, identifier, outputMode };
+                return {
+                    id: entry.id,
+                    title: entry.title,
+                    prompt: entry.prompt,
+                    identifier,
+                    outputMode,
+                    askForContext: entry.askForContext === true
+                };
             });
 
         await this.setPrompts(migrated);
@@ -315,7 +402,14 @@ export class PromptRepository {
             ? entry.identifier
             : (this.slugify(entry.title) || `prompt-${entry.id}`);
         const outputMode: PromptOutputMode = entry.outputMode === 'window' ? 'window' : 'clipboard';
-        return { id: entry.id, title: entry.title, prompt: entry.prompt, identifier, outputMode };
+        return {
+            id: entry.id,
+            title: entry.title,
+            prompt: entry.prompt,
+            identifier,
+            outputMode,
+            askForContext: entry.askForContext === true
+        };
     }
 
     private isValidStoredPrompt(prompt: unknown): prompt is StoredPrompt {

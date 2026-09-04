@@ -21,6 +21,7 @@ export interface AppSettings {
     llmType: ProviderId;
     openaiApiKey: string;
     defaultPromptId: number | null;
+    askEveryTime: boolean;
     appId: string;
     email: string;
     showStart: boolean;
@@ -119,6 +120,12 @@ export interface PromptOption {
     prompt: string;
     identifier: string;
     outputMode: PromptOutputMode;
+    askForContext: boolean;
+}
+
+export interface PromptChoice {
+    prompt: PromptOption;
+    extraInstruction: string;
 }
 
 export type StatusType = 'error' | 'ok' | 'working' | 'info';

@@ -2,12 +2,13 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { LogicalSize, UserAttentionType, Window } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { APP_EVENTS, type AnswerDisplayPayload, type DashboardOpenPayload, type DictateOpenPayload, type WindowReadyPayload } from '../app/events';
+import { APP_EVENTS, type AnswerDisplayPayload, type DashboardOpenPayload, type DictateOpenPayload, type PromptOpenPayload, type WindowReadyPayload } from '../app/events';
 import { WINDOW_CONFIG } from '../config';
 import { centerWindowOnCursorMonitor } from './window-placement';
 import type {
     DashboardSection,
     ManagedWindowId,
+    PromptChoice,
     PromptOption,
     StatusDisplayPayload
 } from '../domain/types';
@@ -150,15 +151,19 @@ export class AppWindows {
         return this.ensureWindow('dictate');
     }
 
-    async choosePrompt(): Promise<PromptOption | null> {
+    async choosePrompt(options: { mode: 'full' | 'extra'; preselected?: PromptOption } = { mode: 'full' }): Promise<PromptChoice | null> {
+        await invoke('remember_frontmost_app').catch((error) => {
+            console.warn('Could not remember frontmost app:', error);
+        });
+
         const promptWindow = await this.ensureWindow('prompt');
         const mainWindow = Window.getCurrent();
 
-        const selectionPromise = new Promise<PromptOption | null>((resolve) => {
+        const selectionPromise = new Promise<PromptChoice | null>((resolve) => {
             let settled = false;
             const cleanupPromises: Array<Promise<() => void>> = [];
 
-            const finish = async (value: PromptOption | null): Promise<void> => {
+            const finish = async (value: PromptChoice | null): Promise<void> => {
                 if (settled) {
                     return;
                 }
@@ -169,7 +174,7 @@ export class AppWindows {
                 resolve(value);
             };
 
-            cleanupPromises.push(mainWindow.once<PromptOption>(APP_EVENTS.PROMPT_SELECTED, (event) => {
+            cleanupPromises.push(mainWindow.once<PromptChoice>(APP_EVENTS.PROMPT_SELECTED, (event) => {
                 void finish(event.payload);
             }));
             cleanupPromises.push(mainWindow.once(APP_EVENTS.PROMPT_CANCELLED, () => {
@@ -181,8 +186,19 @@ export class AppWindows {
             }));
         });
 
-        await promptWindow.emit(APP_EVENTS.PROMPT_OPEN);
+        const size = options.mode === 'extra' ? WINDOW_CONFIG.promptExtra : WINDOW_CONFIG.prompt;
+        await this.tryWindowCall('resize prompt window', () => promptWindow.setSize(
+            new LogicalSize(size.width, size.height)
+        ));
         await this.revealWindow(promptWindow, { focus: true, promoteToFront: true });
+        await invoke('activate_this_app').catch((error) => {
+            console.warn('Could not activate pasteAI:', error);
+        });
+        const payload: PromptOpenPayload = {
+            mode: options.mode,
+            preselected: options.preselected
+        };
+        await promptWindow.emit(APP_EVENTS.PROMPT_OPEN, payload);
 
         return selectionPromise;
     }

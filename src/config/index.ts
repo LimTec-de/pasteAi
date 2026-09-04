@@ -25,6 +25,11 @@ export interface WindowConfig {
         height: number;
         title: string;
     };
+    promptExtra: {
+        width: number;
+        height: number;
+        title: string;
+    };
     answer: {
         width: number;
         height: number;
@@ -66,8 +71,13 @@ export const WINDOW_CONFIG: WindowConfig = {
     },
     'prompt': {
         width: 720,
-        height: 560,
+        height: 620,
         title: 'Select a Prompt'
+    },
+    promptExtra: {
+        width: 520,
+        height: 260,
+        title: 'Additional instruction'
     },
     answer: {
         width: 620,

@@ -12,7 +12,7 @@ import {
     normalizeReplacements,
     normalizeVocabulary
 } from '../domain/dictate-dictionary';
-import { PromptRepository } from '../domain/prompt-repository';
+import { PromptRepository, composeImprovePrompt } from '../domain/prompt-repository';
 import { ProviderGateway } from '../domain/provider-gateway';
 import { SettingsRepository } from '../domain/settings-repository';
 import { isLocalLlmMissing } from '../domain/local-llm';
@@ -29,6 +29,7 @@ interface ImproveInput {
 interface PendingImprove {
     input: ImproveInput;
     prompt: PromptOption;
+    systemPrompt: string;
     useHtml: boolean;
 }
 
@@ -259,20 +260,43 @@ export class ClipboardImprover {
 
     private async improveText(input: ImproveInput, preselectedPrompt: PromptOption | null): Promise<void> {
         try {
-            let selectedPrompt = preselectedPrompt ?? await this.promptRepository.getDefaultPrompt();
-            if (!selectedPrompt) {
-                this.state.runState = 'awaitingPrompt';
-                selectedPrompt = await this.windows.choosePrompt();
-            }
+            let selectedPrompt = preselectedPrompt;
+            let extraInstruction = '';
 
             if (!selectedPrompt) {
-                this.resetRunState();
-                return;
+                const defaultPrompt = await this.promptRepository.getDefaultPrompt();
+                if (await this.promptRepository.getAskEveryTime() || !defaultPrompt) {
+                    this.state.runState = 'awaitingPrompt';
+                    const choice = await this.windows.choosePrompt({ mode: 'full' });
+                    if (!choice) {
+                        this.resetRunState();
+                        return;
+                    }
+
+                    selectedPrompt = choice.prompt;
+                    extraInstruction = choice.extraInstruction;
+                } else if (defaultPrompt.askForContext) {
+                    this.state.runState = 'awaitingPrompt';
+                    const choice = await this.windows.choosePrompt({
+                        mode: 'extra',
+                        preselected: defaultPrompt
+                    });
+                    if (!choice) {
+                        this.resetRunState();
+                        return;
+                    }
+
+                    selectedPrompt = choice.prompt;
+                    extraInstruction = choice.extraInstruction;
+                } else {
+                    selectedPrompt = defaultPrompt;
+                }
             }
 
             this.pendingImprove = {
                 input,
                 prompt: selectedPrompt,
+                systemPrompt: composeImprovePrompt(selectedPrompt.prompt, extraInstruction),
                 useHtml: await this.shouldImproveAsHtml(input, selectedPrompt)
             };
             await this.runPendingImprove();
@@ -301,7 +325,7 @@ export class ClipboardImprover {
 
         try {
             if (pending.useHtml && pending.input.html) {
-                const improvedHtml = await this.providerGateway.improveHtml(pending.input.html, pending.prompt.prompt);
+                const improvedHtml = await this.providerGateway.improveHtml(pending.input.html, pending.systemPrompt);
                 if (generation !== this.improveGeneration) {
                     return;
                 }
@@ -313,7 +337,7 @@ export class ClipboardImprover {
             const sourceText = pending.input.html
                 ? htmlToImprovableText(pending.input.html)
                 : pending.input.text;
-            const improvedText = await this.providerGateway.improve(sourceText, pending.prompt.prompt);
+            const improvedText = await this.providerGateway.improve(sourceText, pending.systemPrompt);
             if (generation !== this.improveGeneration) {
                 return;
             }

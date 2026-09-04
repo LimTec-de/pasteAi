@@ -61,6 +61,7 @@ windows = { version = "0.62", features = [
 
 [target.'cfg(target_os = "linux")'.dependencies]
 enigo = "0.6.1"
+x11rb = "0.14.0"
 
 [lints.rust]
 unused_variables = "allow"

@@ -46,12 +46,9 @@ export class AppRuntime {
         void this.windows.prewarmDictateWindow().catch((error) => {
             console.error('Failed to prewarm dictate window:', error);
         });
-
-        if (!await this.prompts.getDefaultPrompt()) {
-            void this.windows.prewarmPromptWindow().catch((error) => {
-                console.error('Failed to prewarm prompt window:', error);
-            });
-        }
+        void this.windows.prewarmPromptWindow().catch((error) => {
+            console.error('Failed to prewarm prompt window:', error);
+        });
 
         if (settings.showStart) {
             void this.windows.openDashboard('welcome').catch((error) => {
@@ -72,10 +69,6 @@ export class AppRuntime {
         await listen(APP_EVENTS.PROMPTS_CHANGED, async () => {
             await this.settings.reload();
             await this.tray.refreshMenu();
-
-            if (!await this.prompts.getDefaultPrompt()) {
-                await this.windows.prewarmPromptWindow();
-            }
         });
     }
 

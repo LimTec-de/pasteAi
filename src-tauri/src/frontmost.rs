@@ -11,6 +11,8 @@ enum FrontmostTarget {
     MacosPid(i32),
     #[cfg(target_os = "windows")]
     WindowsHwnd(isize),
+    #[cfg(target_os = "linux")]
+    LinuxX11Window(u32),
 }
 
 #[tauri::command]
@@ -22,6 +24,24 @@ pub fn remember_frontmost_app(state: tauri::State<'_, PreviousApp>) {
 pub fn restore_frontmost_app(app: AppHandle, state: tauri::State<'_, PreviousApp>) {
     let target = *state.0.lock().unwrap();
     restore_target(&app, target);
+}
+
+#[tauri::command]
+pub fn activate_this_app(app: AppHandle) {
+    #[cfg(target_os = "macos")]
+    {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        let _ = app.run_on_main_thread(move || {
+            macos::activate_this();
+            let _ = tx.send(());
+        });
+        let _ = rx.recv();
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = app;
+    }
 }
 
 #[tauri::command]
@@ -67,7 +87,12 @@ fn current_frontmost() -> Option<FrontmostTarget> {
         return windows_front::foreground_hwnd().map(FrontmostTarget::WindowsHwnd);
     }
 
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    #[cfg(target_os = "linux")]
+    {
+        return linux_front::active_window().map(FrontmostTarget::LinuxX11Window);
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
     {
         None
     }
@@ -87,6 +112,10 @@ fn restore_target(app: &AppHandle, target: Option<FrontmostTarget>) {
         #[cfg(target_os = "windows")]
         Some(FrontmostTarget::WindowsHwnd(hwnd)) => {
             windows_front::set_foreground(hwnd);
+        }
+        #[cfg(target_os = "linux")]
+        Some(FrontmostTarget::LinuxX11Window(window)) => {
+            linux_front::activate_window(window);
         }
         _ => {}
     }
@@ -156,6 +185,21 @@ mod macos {
         if let Some(app) = NSRunningApplication::runningApplicationWithProcessIdentifier(pid) {
             app.activateWithOptions(NSApplicationActivationOptions::ActivateAllWindows);
         }
+    }
+
+    pub fn activate_this() {
+        if let Some(mtm) = MainThreadMarker::new() {
+            let ns_app = NSApplication::sharedApplication(mtm);
+            ns_app.activate();
+            #[allow(deprecated)]
+            ns_app.activateIgnoringOtherApps(true);
+        }
+
+        #[allow(deprecated)]
+        let _ = NSRunningApplication::currentApplication().activateWithOptions(
+            NSApplicationActivationOptions::ActivateAllWindows
+                | NSApplicationActivationOptions::ActivateIgnoringOtherApps,
+        );
     }
 
     pub fn ensure_accessibility(app: &AppHandle) -> Result<(), String> {
@@ -253,7 +297,10 @@ mod windows_front {
         SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
         VK_CONTROL,
     };
-    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, SetForegroundWindow};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        AttachThreadInput, BringWindowToTop, GetForegroundWindow, GetWindowThreadProcessId,
+        SetForegroundWindow, ShowWindow, SW_RESTORE,
+    };
 
     const VK_V: VIRTUAL_KEY = VIRTUAL_KEY(0x56);
 
@@ -268,7 +315,20 @@ mod windows_front {
 
     pub fn set_foreground(hwnd: isize) {
         let handle = HWND(hwnd as *mut core::ffi::c_void);
-        let _ = unsafe { SetForegroundWindow(handle) };
+        unsafe {
+            let _ = ShowWindow(handle, SW_RESTORE);
+            let _ = BringWindowToTop(handle);
+            let foreground = GetForegroundWindow();
+            let fg_thread = GetWindowThreadProcessId(foreground, None);
+            let target_thread = GetWindowThreadProcessId(handle, None);
+            if fg_thread != 0 && target_thread != 0 && fg_thread != target_thread {
+                let _ = AttachThreadInput(fg_thread, target_thread, true);
+            }
+            let _ = SetForegroundWindow(handle);
+            if fg_thread != 0 && target_thread != 0 && fg_thread != target_thread {
+                let _ = AttachThreadInput(fg_thread, target_thread, false);
+            }
+        }
     }
 
     pub fn post_paste() -> Result<(), String> {
@@ -305,6 +365,9 @@ mod windows_front {
 #[cfg(target_os = "linux")]
 mod linux_front {
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+    use x11rb::connection::Connection;
+    use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask};
+    use x11rb::rust_connection::RustConnection;
 
     pub fn post_paste() -> Result<(), String> {
         let mut enigo = Enigo::new(&Settings::default()).map_err(|error| error.to_string())?;
@@ -318,5 +381,61 @@ mod linux_front {
             .key(Key::Control, Direction::Release)
             .map_err(|error| error.to_string())?;
         Ok(())
+    }
+
+    pub fn active_window() -> Option<u32> {
+        let (conn, root) = x11_connection()?;
+        let atom = intern_active_window(&conn)?;
+        let reply = conn
+            .get_property(false, root, atom, AtomEnum::WINDOW, 0, 1)
+            .ok()?
+            .reply()
+            .ok()?;
+        let window = reply.value32()?.next()?;
+        if window == 0 {
+            None
+        } else {
+            Some(window)
+        }
+    }
+
+    pub fn activate_window(window: u32) {
+        let Some((conn, root)) = x11_connection() else {
+            return;
+        };
+        let Some(atom) = intern_active_window(&conn) else {
+            return;
+        };
+        let event = ClientMessageEvent::new(32, window, atom, [1u32, 0, 0, 0, 0]);
+        let Ok(_) = conn.send_event(
+            false,
+            root,
+            EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
+            event,
+        ) else {
+            return;
+        };
+        let _ = conn.flush();
+        if let Ok(cookie) = conn.get_input_focus() {
+            let _ = cookie.reply();
+        }
+    }
+
+    fn intern_active_window(conn: &RustConnection) -> Option<u32> {
+        conn.intern_atom(false, b"_NET_ACTIVE_WINDOW")
+            .ok()?
+            .reply()
+            .ok()
+            .map(|reply| reply.atom)
+    }
+
+    fn x11_connection() -> Option<(RustConnection, u32)> {
+        if std::env::var_os("WAYLAND_DISPLAY").is_some() && std::env::var_os("DISPLAY").is_none() {
+            return None;
+        }
+
+        let (conn, screen_num) = x11rb::connect(None).ok()?;
+        let root = conn.setup().roots.get(screen_num)?.root;
+        Some((conn, root))
     }
 }

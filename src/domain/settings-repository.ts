@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     llmType: 'pasteai',
     openaiApiKey: '',
     defaultPromptId: null,
+    askEveryTime: true,
     appId: '',
     email: '',
     showStart: true,
@@ -32,6 +33,7 @@ const SETTINGS_KEYS: { [K in keyof AppSettings]: string } = {
     llmType: 'llmType',
     openaiApiKey: 'openaiApiKey',
     defaultPromptId: 'defaultPromptId',
+    askEveryTime: 'askEveryTime',
     appId: 'appId',
     email: 'email',
     showStart: 'showStart',
@@ -130,6 +132,7 @@ export class SettingsRepository {
     private async migrateLegacySettings(): Promise<void> {
         let hasChanges = await this.migrateLegacyDictateLanguage();
         hasChanges = (await this.migrateOllamaSettings()) || hasChanges;
+        hasChanges = (await this.migrateAskEveryTime()) || hasChanges;
         const keys = Object.keys(DEFAULT_SETTINGS) as Array<keyof AppSettings>;
 
         for (const key of keys) {
@@ -226,13 +229,27 @@ export class SettingsRepository {
                 }
 
                 return (value === null ? null : DEFAULT_SETTINGS.defaultPromptId) as AppSettings[K];
+            case 'askEveryTime':
             case 'showStart':
-                return (typeof value === 'boolean' ? value : DEFAULT_SETTINGS.showStart) as AppSettings[K];
             case 'improveHtml':
-                return (typeof value === 'boolean' ? value : DEFAULT_SETTINGS.improveHtml) as AppSettings[K];
+                return (typeof value === 'boolean' ? value : DEFAULT_SETTINGS[key]) as AppSettings[K];
             default:
                 return DEFAULT_SETTINGS[key];
         }
+    }
+
+    private async migrateAskEveryTime(): Promise<boolean> {
+        if (await this.store.has(SETTINGS_KEYS.askEveryTime)) {
+            return false;
+        }
+
+        const defaultPromptId = await this.store.get<unknown>(SETTINGS_KEYS.defaultPromptId);
+        const hasPreferred = typeof defaultPromptId === 'number' && Number.isFinite(defaultPromptId)
+            || (typeof defaultPromptId === 'string'
+                && defaultPromptId.trim() !== ''
+                && Number.isFinite(Number.parseInt(defaultPromptId, 10)));
+        await this.store.set(SETTINGS_KEYS.askEveryTime, !hasPreferred);
+        return true;
     }
 
     private async migrateOllamaSettings(): Promise<boolean> {
