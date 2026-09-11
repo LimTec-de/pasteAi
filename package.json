@@ -23,7 +23,6 @@
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-store": "^2.4.4",
     "@tauri-apps/plugin-updater": "^2.10.1",
-    "openai": "^7.7.0",
     "tauri-plugin-clipboard-api": "^2.1.11"
   },
   "devDependencies": {

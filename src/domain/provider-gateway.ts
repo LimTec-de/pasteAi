@@ -1,4 +1,3 @@
-import OpenAI from 'openai';
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
 import { CONFIG } from '../config';
 import { SettingsRepository } from './settings-repository';
@@ -34,9 +33,6 @@ type PasteAIImproveResponse = PasteAISuccessResponse | PasteAIErrorResponse;
 type NotifyFn = (title: string, body: string) => Promise<void>;
 
 export class ProviderGateway {
-    private openAIClient: OpenAI | null = null;
-    private openAIKey = '';
-
     constructor(
         private readonly settingsRepository: SettingsRepository,
         private readonly notify?: NotifyFn
@@ -44,7 +40,6 @@ export class ProviderGateway {
 
     async warmup(): Promise<void> {
         const settings = await this.settingsRepository.getAll();
-        this.syncOpenAIClient(settings);
 
         if (settings.llmType === 'local') {
             try {
@@ -67,15 +62,12 @@ export class ProviderGateway {
 
     async improve(text: string, systemPrompt: string): Promise<string> {
         const settings = await this.settingsRepository.getAll();
-        this.syncOpenAIClient(settings);
-
         const improved = await this.requestImprovement(text, systemPrompt, settings);
         return improved.trim();
     }
 
     async improveHtml(html: string, systemPrompt: string): Promise<string> {
         const settings = await this.settingsRepository.getAll();
-        this.syncOpenAIClient(settings);
 
         const composedPrompt = `${systemPrompt}\n\nThe input is an HTML fragment. Apply your instructions only to the visible text content. Preserve every HTML tag, attribute, inline style, emoji, image, link, list, and table exactly as given. Do not add, remove, or reorder elements. Output only the resulting HTML fragment with no explanation and no markdown code fences.`;
 
@@ -151,24 +143,36 @@ export class ProviderGateway {
     }
 
     private async improveWithOpenAI(text: string, systemPrompt: string, settings: AppSettings): Promise<string> {
-        if (!settings.openaiApiKey.trim()) {
+        const apiKey = settings.openaiApiKey.trim();
+        if (!apiKey) {
             throw new Error('OpenAI API key missing');
         }
 
-        if (!this.openAIClient) {
-            throw new Error('OpenAI client not initialized');
+        const response = await tauriFetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'gpt-5.6-luna',
+                reasoning_effort: 'none',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: text }
+                ]
+            })
+        });
+        const data = await response.json() as {
+            choices?: Array<{ message?: { content?: string | null } }>;
+            error?: { message?: string };
+        };
+
+        if (!response.ok) {
+            throw new Error(data.error?.message || 'OpenAI request failed');
         }
 
-        const completion = await this.openAIClient.chat.completions.create({
-            model: 'gpt-5.6-luna',
-            reasoning_effort: 'none',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: text }
-            ]
-        });
-
-        return completion.choices[0].message.content || text;
+        return data.choices?.[0]?.message?.content || text;
     }
 
     async createTranscriptionClientSecret(): Promise<string> {
@@ -218,23 +222,5 @@ export class ProviderGateway {
         }
 
         return data.value;
-    }
-
-    private syncOpenAIClient(settings: AppSettings): void {
-        if (settings.llmType !== 'openai' || !settings.openaiApiKey.trim()) {
-            this.openAIClient = null;
-            this.openAIKey = '';
-            return;
-        }
-
-        if (this.openAIClient && this.openAIKey === settings.openaiApiKey) {
-            return;
-        }
-
-        this.openAIClient = new OpenAI({
-            apiKey: settings.openaiApiKey,
-            dangerouslyAllowBrowser: true
-        });
-        this.openAIKey = settings.openaiApiKey;
     }
 }
