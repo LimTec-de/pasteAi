@@ -16,7 +16,8 @@
 }
 
 .dictate-meter__pulse,
-.dictate-meter__core {
+.dictate-meter__core,
+.dictate-meter__ring {
     grid-area: 1 / 1;
     border-radius: 999px;
 }
@@ -29,6 +30,11 @@
     transition: transform 80ms linear;
 }
 
+.dictate-meter.is-connecting .dictate-meter__pulse {
+    background: rgba(220, 38, 38, 0.22);
+    animation: dictate-connect-pulse 1.1s ease-in-out infinite;
+}
+
 .dictate-meter.is-receiving .dictate-meter__pulse {
     background: rgba(249, 115, 22, 0.28);
 }
@@ -39,8 +45,49 @@
     background: var(--color-accent);
 }
 
+.dictate-meter.is-connecting .dictate-meter__core {
+    background: #dc2626;
+}
+
 .dictate-meter.is-receiving .dictate-meter__core {
     background: var(--color-accent-strong);
+}
+
+.dictate-meter__ring {
+    width: 42px;
+    height: 42px;
+    box-sizing: border-box;
+    border: 2.5px solid transparent;
+    opacity: 0;
+}
+
+.dictate-meter.is-converting .dictate-meter__pulse {
+    opacity: 0;
+    transition: none;
+}
+
+.dictate-meter.is-converting .dictate-meter__ring {
+    opacity: 1;
+    border-color: var(--color-accent);
+    border-right-color: transparent;
+    animation: dictate-convert-spin 0.75s linear infinite;
+}
+
+.dictate-meter.is-converting .dictate-meter__core {
+    background: var(--color-accent-strong);
+}
+
+@keyframes dictate-connect-pulse {
+    50% {
+        transform: scale(0.95);
+        opacity: 0.95;
+    }
+}
+
+@keyframes dictate-convert-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .dictate-status {

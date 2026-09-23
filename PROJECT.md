@@ -3,7 +3,7 @@
 ## Hold-to-dictate
 - Dedicated `dictateShortcut` (default `CommandOrControl+Shift+Space`). Hold=listen, release=clipboard+paste (`dictateOutputMode=insert`) or copy only. Tap <450ms latches overlay with Done. Insert writes clipboard then Cmd/Ctrl+V. Second press finishes (before `isBusy`). Never Cmd/Ctrl+key without Shift/Alt. macOS `CommandOrControl` is ⌘, not ⌃. No preview-commit while holding.
 - Overlay must not take focus (`showDictate` focus false + immediate `restore_frontmost_app`) or `Released` from tauri-plugin-global-shortcut 2.3.2 is unreliable. Size 380×360.
-- Overlay on press before engine ready. OpenAI mic buffers PCM until WS open. Missing key / Apple unavailable / Parakeet missing → `providers`. No silent fallback.
+- Overlay on press before engine ready. Dictate window prewarms `AudioContext` + PCM worklet (no mic). OpenAI buffers PCM until `session.updated`. Overlay connecting (red) until the mic is capturing, not until OpenAI is connected; stays visible through STT (`Transcribing…`). Missing key / Apple unavailable / Parakeet missing → `providers`. No silent fallback.
 - `frontmost.rs`: remember macOS pid / Windows HWND / Linux X11 `_NET_ACTIVE_WINDOW`; paste restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it. Prompt picker: remember, `activate_this_app`, hide, restore. Windows AttachThreadInput. Wayland remember/restore no-op.
 
 ## Dictation settings

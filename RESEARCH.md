@@ -4,6 +4,7 @@
 - Hold-to-talk = committed-turn Realtime transcription, model `gpt-transcribe`. `gpt-live-transcribe` is live captions (worse WER). Mint: `POST /v1/realtime/client_secrets` `session.type=transcription`. WS `wss://api.openai.com/v1/realtime?intent=transcription` subprotocols `realtime` + `openai-insecure-api-key.<ek_>` (browser WS cannot set Auth headers). Docs: https://developers.openai.com/api/docs/guides/realtime-transcription#transcribe-a-committed-turn
 - Switching the mint URL does not make `gpt-transcribe` caption while you speak. Deltas only after `input_audio_buffer.commit`. Do not send `openai-beta` (removed 2026-05-12).
 - PCM 24kHz 16-bit mono LE. `languages` is ISO-639-1 array (not `language`). `keywords` = spoken terms only; `<` `>` CR/LF reject the session; omit when empty. `turn_detection: null`; do not send `delay`. One buffer, one commit on release.
+- Wait for `session.updated` after sending `session.update` before `input_audio_buffer.append`. `session.created` arrives on WS open; `session.updated` ~150ms later. Appends at raw WS `open` precede the updated session. Verified 2026-09-21.
 
 ## tauri-plugin-global-shortcut 2.3.2 — 2026-08-27
 - `ShortcutEvent.state` is `Pressed` | `Released`. Register consumes the key. `CommandOrControl` → macOS `Modifiers::SUPER` (⌘), not ⌃. https://v2.tauri.app/plugin/global-shortcut/

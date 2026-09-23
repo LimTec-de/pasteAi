@@ -11,9 +11,11 @@
     } from '../../app/events';
     import { cancelAppleDictation, stopAppleDictation } from '../../domain/apple-system';
     import { transcribeLocalStt } from '../../domain/local-stt';
-    import { LiveTranscriptionSession, MicrophoneCapture } from '../../features/live-transcription';
+    import { dictateAudioGraph, LiveTranscriptionSession, MicrophoneCapture } from '../../features/live-transcription';
     import { formatAcceleratorForDisplay } from '../../platform/shortcut';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
+
+    type DictatePhase = 'connecting' | 'recording' | 'converting';
 
     let session: LiveTranscriptionSession | null = null;
     let capture: MicrophoneCapture | null = null;
@@ -24,11 +26,12 @@
     let committedByItem = new Map<string, string>();
     let committedOrder: string[] = [];
     let partialByItem = new Map<string, string>();
+    let phase: DictatePhase = 'connecting';
     let receiving = false;
     let level = 0;
     let shortcutLabel = '';
     let latched = false;
-    let statusMessage = 'Starting microphone…';
+    let statusMessage = 'Starting…';
     let errorMessage = '';
     let finishing = false;
 
@@ -42,16 +45,32 @@
     $: actionLine = latched
         ? (outputMode === 'clipboard' ? 'Click Done to copy to clipboard.' : 'Click Done to insert and copy to clipboard.')
         : (outputMode === 'clipboard' ? 'Release to copy to clipboard.' : 'Release to insert and copy to clipboard.');
+    $: meterClass = [
+        phase === 'connecting' ? 'is-connecting' : '',
+        phase === 'recording' && receiving ? 'is-receiving' : '',
+        phase === 'converting' ? 'is-converting' : ''
+    ].filter((part) => part.length > 0).join(' ');
 
     function resetTranscript(): void {
         committedByItem = new Map();
         committedOrder = [];
         partialByItem = new Map();
+        phase = 'connecting';
         receiving = false;
         level = 0;
         latched = false;
         errorMessage = '';
         finishing = false;
+        statusMessage = 'Starting…';
+    }
+
+    function applyLevel(nextLevel: number): void {
+        if (phase !== 'recording') {
+            return;
+        }
+
+        level = nextLevel;
+        receiving = nextLevel > 0.06;
     }
 
     function createOpenAiSession(): LiveTranscriptionSession {
@@ -73,8 +92,7 @@
                 partialByItem = nextPartial;
             },
             onLevel(nextLevel) {
-                level = nextLevel;
-                receiving = nextLevel > 0.06;
+                applyLevel(nextLevel);
             },
             onError(message) {
                 errorMessage = message;
@@ -90,26 +108,23 @@
         engine = payload.engine;
         outputMode = payload.outputMode;
         shortcutLabel = formatAcceleratorForDisplay(payload.shortcut);
-        statusMessage = 'Starting microphone…';
 
         if (engine === 'apple') {
             unlistenLevel = await listen<{ level: number }>('apple-dictate-level', (event) => {
-                level = event.payload.level;
-                receiving = event.payload.level > 0.06;
+                applyLevel(event.payload.level);
             });
             return;
         }
 
         if (engine === 'local') {
             const nextCapture = new MicrophoneCapture((nextLevel) => {
-                level = nextLevel;
-                receiving = nextLevel > 0.06;
+                applyLevel(nextLevel);
             });
             capture = nextCapture;
             try {
                 await nextCapture.start(payload.microphoneId || undefined);
                 if (capture === nextCapture) {
-                    statusMessage = 'Recording started';
+                    markReady();
                 }
             } catch (error) {
                 errorMessage = error instanceof Error ? error.message : String(error);
@@ -128,7 +143,7 @@
                 return;
             }
 
-            statusMessage = 'Recording started';
+            markReady();
             if (payload.clientSecret) {
                 await attachOpenAiSecret(payload.clientSecret);
             }
@@ -160,9 +175,20 @@
     }
 
     function markReady(): void {
-        if (!errorMessage) {
-            statusMessage = 'Recording started';
+        if (errorMessage || phase === 'converting') {
+            return;
         }
+
+        phase = 'recording';
+        statusMessage = 'Recording started';
+    }
+
+    function beginConvert(): void {
+        finishing = true;
+        phase = 'converting';
+        statusMessage = 'Transcribing…';
+        receiving = false;
+        level = 0;
     }
 
     function stopSession(): void {
@@ -185,21 +211,18 @@
             return;
         }
 
-        finishing = true;
+        beginConvert();
 
         if (engine === 'local') {
-            statusMessage = 'Transcribing…';
             const recorded = capture?.takePcm16();
             stopSession();
             try {
                 const text = recorded && recorded.pcm.length > 0
                     ? (await transcribeLocalStt(recorded.pcm, recorded.sampleRate)).trim()
                     : '';
-                await hideWindow();
                 const payload: DictateCommitPayload = { text };
                 await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
             } catch (error) {
-                await hideWindow();
                 const payload: DictateCommitPayload = {
                     text: '',
                     error: error instanceof Error ? error.message : String(error)
@@ -208,8 +231,6 @@
             }
             return;
         }
-
-        await hideWindow();
 
         if (engine === 'apple') {
             try {
@@ -280,6 +301,10 @@
         let unlistenFinish: (() => void) | undefined;
         let unlistenCloseRequested: (() => void) | undefined;
 
+        void dictateAudioGraph.ensure().catch((error) => {
+            console.warn('Could not prewarm dictate audio graph:', error);
+        });
+
         void (async () => {
             const currentWindow = Window.getCurrent();
 
@@ -290,14 +315,18 @@
                 void attachOpenAiSecret(event.payload.clientSecret);
             });
             unlistenReady = await currentWindow.listen(APP_EVENTS.DICTATE_READY, () => {
-                markReady();
+                if (engine === 'apple') {
+                    markReady();
+                }
             });
             unlistenHide = await currentWindow.listen(APP_EVENTS.DICTATE_HIDE, () => {
                 stopSession();
             });
             unlistenLatch = await currentWindow.listen(APP_EVENTS.DICTATE_LATCH, () => {
                 latched = true;
-                statusMessage = 'Recording started';
+                if (phase === 'recording' && !errorMessage) {
+                    statusMessage = 'Recording started';
+                }
             });
             unlistenFinish = await currentWindow.listen(APP_EVENTS.DICTATE_FINISH, () => {
                 void commit();
@@ -334,8 +363,12 @@
     onClose={cancel}
 >
     <main class="window-page dictate-shell">
-        <div class={`dictate-meter ${receiving ? 'is-receiving' : ''}`} aria-hidden="true">
-            <span class="dictate-meter__pulse" style={`transform: scale(${0.65 + (level * 0.7)})`}></span>
+        <div class={`dictate-meter ${meterClass}`} aria-hidden="true">
+            <span
+                class="dictate-meter__pulse"
+                style={phase === 'recording' ? `transform: scale(${0.65 + (level * 0.7)})` : ''}
+            ></span>
+            <span class="dictate-meter__ring"></span>
             <span class="dictate-meter__core"></span>
         </div>
 
@@ -348,7 +381,7 @@
 
         <div class="dictate-footer">
             <button class="app-button app-button--secondary" type="button" on:click={() => void cancel()}>Cancel</button>
-            {#if latched}
+            {#if latched && phase !== 'converting'}
                 <button class="app-button app-button--primary" type="button" on:click={() => void commit()}>Done</button>
             {/if}
         </div>

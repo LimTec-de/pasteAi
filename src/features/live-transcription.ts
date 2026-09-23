@@ -17,6 +17,47 @@ registerProcessor('pcm-processor', PcmProcessor);
 
 const COMMIT_TIMEOUT_MS = 15_000;
 
+async function addPcmWorklet(audioContext: AudioContext): Promise<void> {
+    const blob = new Blob([WORKLET_SOURCE], { type: 'application/javascript' });
+    const workletUrl = URL.createObjectURL(blob);
+    try {
+        await audioContext.audioWorklet.addModule(workletUrl);
+    } finally {
+        URL.revokeObjectURL(workletUrl);
+    }
+}
+
+class DictateAudioGraph {
+    private context: AudioContext | null = null;
+    private workletReady: Promise<void> | null = null;
+
+    async ensure(): Promise<AudioContext> {
+        if (!this.context || this.context.state === 'closed') {
+            this.context = new AudioContext();
+            this.workletReady = addPcmWorklet(this.context);
+        }
+
+        try {
+            await this.workletReady;
+        } catch (error) {
+            if (this.context.state !== 'closed') {
+                void this.context.close();
+            }
+            this.context = null;
+            this.workletReady = null;
+            throw error;
+        }
+
+        if (this.context.state === 'suspended') {
+            await this.context.resume();
+        }
+
+        return this.context;
+    }
+}
+
+export const dictateAudioGraph = new DictateAudioGraph();
+
 export function transcriptionSessionUpdate(
     languages: string[],
     keywords: string[] = [],
@@ -50,6 +91,7 @@ export interface TranscriptionHandlers {
     onCompleted: (itemId: string, transcript: string) => void;
     onLevel: (level: number) => void;
     onError: (message: string) => void;
+    onReady?: () => void;
 }
 
 interface RealtimeEvent {
@@ -67,6 +109,7 @@ export class LiveTranscriptionSession {
     private workletNode: AudioWorkletNode | null = null;
     private sourceNode: MediaStreamAudioSourceNode | null = null;
     private analyser: AnalyserNode | null = null;
+    private muteNode: GainNode | null = null;
     private pcmRemainder = new Float32Array(0);
     private levelFrame = 0;
     private ready = false;
@@ -122,6 +165,12 @@ export class LiveTranscriptionSession {
         }
 
         this.stream = await navigator.mediaDevices.getUserMedia({ audio });
+        if (this.closed) {
+            this.stream.getTracks().forEach((track) => track.stop());
+            this.stream = null;
+            return;
+        }
+
         await this.startMicPipeline();
     }
 
@@ -145,10 +194,6 @@ export class LiveTranscriptionSession {
                 options.keywords ?? [],
                 options.prompt
             )));
-            this.ready = true;
-            this.connected = true;
-            this.flushPendingPcm();
-            this.settleConnect();
         });
 
         this.socket.addEventListener('message', (event) => {
@@ -226,17 +271,15 @@ export class LiveTranscriptionSession {
         this.workletNode?.disconnect();
         this.sourceNode?.disconnect();
         this.analyser?.disconnect();
+        this.muteNode?.disconnect();
         this.workletNode = null;
         this.sourceNode = null;
         this.analyser = null;
+        this.muteNode = null;
+        this.audioContext = null;
 
         this.stream?.getTracks().forEach((track) => track.stop());
         this.stream = null;
-
-        if (this.audioContext) {
-            void this.audioContext.close();
-            this.audioContext = null;
-        }
 
         if (this.socket && this.socket.readyState < WebSocket.CLOSING) {
             this.socket.close();
@@ -244,24 +287,29 @@ export class LiveTranscriptionSession {
         this.socket = null;
     }
 
+    private markSessionReady(): void {
+        if (this.closed || this.ready) {
+            return;
+        }
+
+        this.ready = true;
+        this.connected = true;
+        this.flushPendingPcm();
+        this.settleConnect();
+        this.handlers.onReady?.();
+    }
+
     private async startMicPipeline(): Promise<void> {
         if (!this.stream) {
             throw new Error('Microphone stream missing');
         }
 
-        const audioContext = new AudioContext();
-        this.audioContext = audioContext;
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
+        const audioContext = await dictateAudioGraph.ensure();
+        if (this.closed) {
+            return;
         }
-        const blob = new Blob([WORKLET_SOURCE], { type: 'application/javascript' });
-        const workletUrl = URL.createObjectURL(blob);
 
-        try {
-            await audioContext.audioWorklet.addModule(workletUrl);
-        } finally {
-            URL.revokeObjectURL(workletUrl);
-        }
+        this.audioContext = audioContext;
 
         const source = audioContext.createMediaStreamSource(this.stream);
         const analyser = audioContext.createAnalyser();
@@ -292,6 +340,7 @@ export class LiveTranscriptionSession {
         this.sourceNode = source;
         this.analyser = analyser;
         this.workletNode = worklet;
+        this.muteNode = mute;
         this.pumpLevel();
     }
 
@@ -388,6 +437,9 @@ export class LiveTranscriptionSession {
         }
 
         switch (event.type) {
+            case 'session.updated':
+                this.markSessionReady();
+                break;
             case 'conversation.item.input_audio_transcription.delta':
                 if (event.item_id && event.delta) {
                     this.handlers.onDelta(event.item_id, event.delta);
@@ -417,6 +469,7 @@ export class MicrophoneCapture {
     private workletNode: AudioWorkletNode | null = null;
     private sourceNode: MediaStreamAudioSourceNode | null = null;
     private analyser: AnalyserNode | null = null;
+    private muteNode: GainNode | null = null;
     private levelFrame = 0;
     private closed = false;
     private chunks: Float32Array[] = [];
@@ -435,20 +488,15 @@ export class MicrophoneCapture {
         }
 
         this.stream = await navigator.mediaDevices.getUserMedia({ audio });
-        const audioContext = new AudioContext();
-        this.audioContext = audioContext;
-        this.sampleRate = audioContext.sampleRate;
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
+        const audioContext = await dictateAudioGraph.ensure();
+        if (this.closed) {
+            this.stream.getTracks().forEach((track) => track.stop());
+            this.stream = null;
+            return;
         }
 
-        const blob = new Blob([WORKLET_SOURCE], { type: 'application/javascript' });
-        const workletUrl = URL.createObjectURL(blob);
-        try {
-            await audioContext.audioWorklet.addModule(workletUrl);
-        } finally {
-            URL.revokeObjectURL(workletUrl);
-        }
+        this.audioContext = audioContext;
+        this.sampleRate = audioContext.sampleRate;
 
         const source = audioContext.createMediaStreamSource(this.stream);
         const analyser = audioContext.createAnalyser();
@@ -471,6 +519,7 @@ export class MicrophoneCapture {
         this.sourceNode = source;
         this.analyser = analyser;
         this.workletNode = worklet;
+        this.muteNode = mute;
         this.pumpLevel();
     }
 
@@ -504,15 +553,14 @@ export class MicrophoneCapture {
         this.workletNode?.disconnect();
         this.sourceNode?.disconnect();
         this.analyser?.disconnect();
+        this.muteNode?.disconnect();
         this.workletNode = null;
         this.sourceNode = null;
         this.analyser = null;
+        this.muteNode = null;
+        this.audioContext = null;
         this.stream?.getTracks().forEach((track) => track.stop());
         this.stream = null;
-        if (this.audioContext) {
-            void this.audioContext.close();
-            this.audioContext = null;
-        }
     }
 
     private pumpLevel(): void {

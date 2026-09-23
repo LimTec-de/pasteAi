@@ -265,6 +265,7 @@ export class DictationController {
             return;
         }
 
+        const mint = this.providerGateway.createTranscriptionClientSecret();
         await this.openOverlay({
             engine: 'openai',
             shortcut,
@@ -276,7 +277,7 @@ export class DictationController {
         });
 
         try {
-            const clientSecret = await this.providerGateway.createTranscriptionClientSecret();
+            const clientSecret = await mint;
             if (this.cancelled) {
                 return;
             }
