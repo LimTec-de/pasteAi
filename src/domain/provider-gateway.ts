@@ -1,4 +1,5 @@
 import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+import { error as logError, info } from '@tauri-apps/plugin-log';
 import { CONFIG } from '../config';
 import { SettingsRepository } from './settings-repository';
 import type { AppSettings, PasteAIQuota } from './types';
@@ -33,6 +34,8 @@ type PasteAIImproveResponse = PasteAISuccessResponse | PasteAIErrorResponse;
 type NotifyFn = (title: string, body: string) => Promise<void>;
 
 export class ProviderGateway {
+    private openAIRequestCount = 0;
+
     constructor(
         private readonly settingsRepository: SettingsRepository,
         private readonly notify?: NotifyFn
@@ -148,25 +151,38 @@ export class ProviderGateway {
             throw new Error('OpenAI API key missing');
         }
 
-        const response = await tauriFetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'gpt-5.6-luna',
-                reasoning_effort: 'none',
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: text }
-                ]
-            })
-        });
+        const requestNumber = ++this.openAIRequestCount;
+        const startedAt = performance.now();
+        const elapsed = () => `${Math.round(performance.now() - startedAt)}ms`;
+        void info(`[openai rewrite #${requestNumber}] sent (${text.length} chars)`);
+
+        let response: Response;
+        try {
+            response = await tauriFetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST',
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model: 'gpt-5.6-luna',
+                    reasoning_effort: 'none',
+                    messages: [
+                        { role: 'system', content: systemPrompt },
+                        { role: 'user', content: text }
+                    ]
+                })
+            });
+        } catch (error) {
+            void logError(`[openai rewrite #${requestNumber}] failed after ${elapsed()}: ${String(error)}`);
+            throw error;
+        }
+        void info(`[openai rewrite #${requestNumber}] HTTP ${response.status} after ${elapsed()} (openai-processing-ms=${response.headers.get('openai-processing-ms')}, x-request-id=${response.headers.get('x-request-id')})`);
         const data = await response.json() as {
             choices?: Array<{ message?: { content?: string | null } }>;
             error?: { message?: string };
         };
+        void info(`[openai rewrite #${requestNumber}] body read after ${elapsed()}`);
 
         if (!response.ok) {
             throw new Error(data.error?.message || 'OpenAI request failed');

@@ -13,7 +13,8 @@
 - `dictatePromptId` null=raw, default builtin `dictate-cleanup`. Missing id at speak → that builtin in memory, no store write. Ignore prompt `outputMode`; still `dictateOutputMode`. Improve before clipboard write.
 
 ## OpenAI rewrite
-- `llmType=openai`: `POST /v1/chat/completions` via `tauri-plugin-http` (same stack as PasteAI and the transcription mint). `gpt-5.6-luna` + `reasoning_effort=none`. Do not use the JS SDK / WKWebView `fetch` from hidden `main` — first request can stall many seconds. STT stays `gpt-transcribe`.
+- `llmType=openai`: `POST /v1/chat/completions` via `tauri-plugin-http` (same stack as PasteAI and the transcription mint). `gpt-5.6-luna` + `reasoning_effort=none`. STT stays `gpt-transcribe`.
+- Hidden `main` runs the whole improve flow, so it needs `backgroundThrottling: "disabled"` (`src-tauri/tauri.conf.json`). Without it WebKit suspends the page: each await (fetch, clipboard, status) waits until another event wakes it. Symptom: 20–95s "improving" while `openai-processing-ms` is ~1–4s, and Retry "fixes" it because the click wakes `main`. Switching the HTTP client does not help.
 
 ## Improve toast
 - Retry after 4s. `STATUS_ACTION` cancel/retry; generation guard drops late LLM result. Clipboard cancel: original stays. Dictation cancel/error after STT: write raw+replacements then paste. Overlay cancel during listen writes nothing. Retry re-runs same prompt/input.

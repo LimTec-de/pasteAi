@@ -28,6 +28,7 @@
         "width": 10,
         "height": 10,
         "visible": false,
+        "backgroundThrottling": "disabled",
         "skipTaskbar": true,
         "transparent": false,
         "decorations": false,

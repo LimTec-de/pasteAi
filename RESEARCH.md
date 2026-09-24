@@ -40,6 +40,9 @@
 ## OpenAI rewrite models — 2026-09-01
 - `gpt-5.6-luna` default `reasoning.effort=medium`; for short rewrite set `reasoning_effort: "none"` or first token is much slower. https://developers.openai.com/api/docs/models/gpt-5.6-luna
 
+## WKWebView background throttling (Tauri 2.11 / wry 0.55) — 2026-09-24
+- A web view not in a visible window defaults to `WKPreferences.inactiveSchedulingPolicy = suspend`: JS and IPC replies pause until something wakes the page. Tauri window config `backgroundThrottling: "disabled"` → wry sets `.none` (macOS 14+ only; ignored on Linux/Windows). Source: `tauri-utils-2.9.3/src/config.rs` `background_throttling`, `wry-0.55.1/src/wkwebview/mod.rs` L473–495. https://developer.apple.com/documentation/webkit/wkpreferences/inactiveschedulingpolicy
+
 ## Focus restore other apps — 2026-09-02
 - Linux X11: EWMH `_NET_ACTIVE_WINDOW` ClientMessage (`source=1`), then `ConnectionExt::sync()`. Do not `XSetInputFocus`. Wayland: skip remember when `WAYLAND_DISPLAY` set and `DISPLAY` unset.
 - Windows: `AttachThreadInput` then `SetForegroundWindow`. `windows` 0.62: `AttachThreadInput` is `Win32::System::Threading`.
