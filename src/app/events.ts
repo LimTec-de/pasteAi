@@ -26,6 +26,7 @@ export const APP_EVENTS = {
     DICTATE_FINISH: 'dictate:finish',
     DICTATE_COMMIT: 'dictate:commit',
     DICTATE_CANCEL: 'dictate:cancel',
+    DICTATE_RETRY: 'dictate:retry',
     STATUS_ACTION: 'status:action'
 } as const;
 
@@ -70,6 +71,8 @@ export interface StatusActionPayload {
 export interface DictateCommitPayload {
     text: string;
     error?: string;
+    errorDetail?: string;
+    retryable?: boolean;
 }
 
 export interface AppEventPayloads {
@@ -91,5 +94,6 @@ export interface AppEventPayloads {
     [APP_EVENTS.DICTATE_FINISH]: undefined;
     [APP_EVENTS.DICTATE_COMMIT]: DictateCommitPayload;
     [APP_EVENTS.DICTATE_CANCEL]: undefined;
+    [APP_EVENTS.DICTATE_RETRY]: undefined;
     [APP_EVENTS.STATUS_ACTION]: StatusActionPayload;
 }

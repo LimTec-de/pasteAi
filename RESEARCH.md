@@ -5,6 +5,7 @@
 - Switching the mint URL does not make `gpt-transcribe` caption while you speak. Deltas only after `input_audio_buffer.commit`. Do not send `openai-beta` (removed 2026-05-12).
 - PCM 24kHz 16-bit mono LE. `languages` is ISO-639-1 array (not `language`). `keywords` = spoken terms only; `<` `>` CR/LF reject the session; omit when empty. `turn_detection: null`; do not send `delay`. One buffer, one commit on release.
 - Wait for `session.updated` after sending `session.update` before `input_audio_buffer.append`. `session.created` arrives on WS open; `session.updated` ~150ms later. Appends at raw WS `open` precede the updated session. Verified 2026-09-21.
+- Failed transcription arrives as `conversation.item.input_audio_transcription.failed` with `error.code`/`message` (e.g. `audio_unintelligible`), not as `error`; unhandled, the client just waits for `completed`. `input_audio_buffer.committed` confirms the commit. https://developers.openai.com/api/reference/resources/realtime/server-events (2026-10-01)
 
 ## tauri-plugin-global-shortcut 2.3.2 — 2026-08-27
 - `ShortcutEvent.state` is `Pressed` | `Released`. Register consumes the key. `CommandOrControl` → macOS `Modifiers::SUPER` (⌘), not ⌃. https://v2.tauri.app/plugin/global-shortcut/
@@ -42,6 +43,8 @@
 
 ## WKWebView background throttling (Tauri 2.11 / wry 0.55) — 2026-09-24
 - A web view not in a visible window defaults to `WKPreferences.inactiveSchedulingPolicy = suspend`: JS and IPC replies pause until something wakes the page. Tauri window config `backgroundThrottling: "disabled"` → wry sets `.none` (macOS 14+ only; ignored on Linux/Windows). Source: `tauri-utils-2.9.3/src/config.rs` `background_throttling`, `wry-0.55.1/src/wkwebview/mod.rs` L473–495. https://developer.apple.com/documentation/webkit/wkpreferences/inactiveschedulingpolicy
+- A running `AudioContext` (silent graph) in a hidden, suspended page keeps the output device on: `pmset -g assertions` shows coreaudiod `PreventUserIdleSystemSleep … audio-out BuiltInSpeakerDevice` for the app's WebKit GPU process (~0.8% CPU) while the web process is idle. `suspend()` releases it. Verified 2026-10-01, macOS 27.
+- `getUserMedia` resolves before the mic delivers audio; the source node outputs exact zeros until then. MacBook Pro mic with `echoCancellation`: first non-zero frame ~1.5 s after overlay open. Gating on `getUserMedia` lost the first ~3 spoken numbers. Verified 2026-10-01.
 
 ## Focus restore other apps — 2026-09-02
 - Linux X11: EWMH `_NET_ACTIVE_WINDOW` ClientMessage (`source=1`), then `ConnectionExt::sync()`. Do not `XSetInputFocus`. Wayland: skip remember when `WAYLAND_DISPLAY` set and `DISPLAY` unset.

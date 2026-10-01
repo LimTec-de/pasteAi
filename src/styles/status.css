@@ -126,6 +126,21 @@ body::after {
     text-underline-offset: 0.18em;
 }
 
+.status-toast__detail {
+    margin: 0.2rem 0 0;
+    max-height: 9rem;
+    overflow: auto;
+    padding: 0.5rem 0.6rem;
+    border-radius: 8px;
+    background: var(--color-bg-deep);
+    color: var(--color-muted);
+    font: 0.78rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: pre-wrap;
+    word-break: break-word;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
 .status-toast__pairs {
     margin: 0.35rem 0 0;
     padding: 0;

@@ -3,7 +3,8 @@
 ## Hold-to-dictate
 - Dedicated `dictateShortcut` (default `CommandOrControl+Shift+Space`). Hold=listen, release=clipboard+paste (`dictateOutputMode=insert`) or copy only. Tap <450ms latches overlay with Done. Insert writes clipboard then Cmd/Ctrl+V. Second press finishes (before `isBusy`). Never Cmd/Ctrl+key without Shift/Alt. macOS `CommandOrControl` is ⌘, not ⌃. No preview-commit while holding.
 - Overlay must not take focus (`showDictate` focus false + immediate `restore_frontmost_app`) or `Released` from tauri-plugin-global-shortcut 2.3.2 is unreliable. Size 380×360.
-- Overlay on press before engine ready. Dictate window prewarms `AudioContext` + PCM worklet (no mic). OpenAI buffers PCM until `session.updated`. Overlay connecting (red) until the mic is capturing, not until OpenAI is connected; stays visible through STT (`Transcribing…`). Missing key / Apple unavailable / Parakeet missing → `providers`. No silent fallback.
+- Overlay on press before engine ready. Dictate window prewarms `AudioContext` + PCM worklet (no mic) but keeps the context suspended unless recording (`DictateAudioGraph` acquire/release); a running one blocked idle sleep. OpenAI buffers PCM until `session.updated`. Overlay connecting (red) until the first non-zero PCM frame (not `getUserMedia` resolve, see RESEARCH), not OpenAI connected; stays visible through STT (`Transcribing…`). Missing key / Apple unavailable / Parakeet missing → `providers`. No silent fallback.
+- OpenAI STT failure after release: dictate keeps the PCM; toast `detail` + Retry replays it in a fresh session with a new key. Dictate drops results after `DICTATE_HIDE` (`hideGeneration`) so a main-initiated hide does not emit a second error.
 - `frontmost.rs`: remember macOS pid / Windows HWND / Linux X11 `_NET_ACTIVE_WINDOW`; paste restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it. Prompt picker: remember, `activate_this_app`, hide, restore. Windows AttachThreadInput. Wayland remember/restore no-op.
 
 ## Dictation settings
@@ -14,7 +15,7 @@
 
 ## OpenAI rewrite
 - `llmType=openai`: `POST /v1/chat/completions` via `tauri-plugin-http` (same stack as PasteAI and the transcription mint). `gpt-5.6-luna` + `reasoning_effort=none`. STT stays `gpt-transcribe`.
-- Hidden `main` runs the whole improve flow, so it needs `backgroundThrottling: "disabled"` (`src-tauri/tauri.conf.json`). Without it WebKit suspends the page: each await (fetch, clipboard, status) waits until another event wakes it. Symptom: 20–95s "improving" while `openai-processing-ms` is ~1–4s, and Retry "fixes" it because the click wakes `main`. Switching the HTTP client does not help.
+- Hidden `main` runs the whole improve flow, so it needs `backgroundThrottling: "disabled"` (`src-tauri/tauri.conf.json`). Without it WebKit suspends the page: each await (fetch, clipboard, status) waits until another event wakes it. Symptom: 20–95s "improving" while `openai-processing-ms` is ~1–4s, and Retry "fixes" it because the click wakes `main`. Switching the HTTP client does not help. Idle cost ≈0 (measured 2026-10-01): `main` has no JS timers; the clipboard monitor is a Rust thread.
 
 ## Improve toast
 - Retry after 4s. `STATUS_ACTION` cancel/retry; generation guard drops late LLM result. Clipboard cancel: original stays. Dictation cancel/error after STT: write raw+replacements then paste. Overlay cancel during listen writes nothing. Retry re-runs same prompt/input.

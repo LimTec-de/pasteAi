@@ -27,32 +27,68 @@ async function addPcmWorklet(audioContext: AudioContext): Promise<void> {
     }
 }
 
+// A running AudioContext keeps the output device open and blocks idle sleep, so it only runs while recording.
 class DictateAudioGraph {
     private context: AudioContext | null = null;
     private workletReady: Promise<void> | null = null;
+    private users = 0;
+    private transition: Promise<void> = Promise.resolve();
 
-    async ensure(): Promise<AudioContext> {
+    async prewarm(): Promise<void> {
+        const context = await this.load();
+        if (this.users === 0) {
+            await this.setRunning(context, false);
+        }
+    }
+
+    async acquire(): Promise<AudioContext> {
+        const context = await this.load();
+        this.users += 1;
+        try {
+            await this.setRunning(context, true);
+        } catch (error) {
+            this.release();
+            throw error;
+        }
+
+        return context;
+    }
+
+    release(): void {
+        this.users -= 1;
+        if (this.users === 0 && this.context) {
+            void this.setRunning(this.context, false);
+        }
+    }
+
+    private async load(): Promise<AudioContext> {
         if (!this.context || this.context.state === 'closed') {
             this.context = new AudioContext();
             this.workletReady = addPcmWorklet(this.context);
         }
 
+        const context = this.context;
         try {
             await this.workletReady;
         } catch (error) {
-            if (this.context.state !== 'closed') {
-                void this.context.close();
+            if (context.state !== 'closed') {
+                void context.close();
             }
-            this.context = null;
-            this.workletReady = null;
+            if (this.context === context) {
+                this.context = null;
+                this.workletReady = null;
+            }
             throw error;
         }
 
-        if (this.context.state === 'suspended') {
-            await this.context.resume();
-        }
+        return context;
+    }
 
-        return this.context;
+    private setRunning(context: AudioContext, running: boolean): Promise<void> {
+        this.transition = this.transition
+            .catch(() => undefined)
+            .then(() => (running ? context.resume() : context.suspend()));
+        return this.transition;
     }
 }
 
@@ -99,7 +135,13 @@ interface RealtimeEvent {
     item_id?: string;
     delta?: string;
     transcript?: string;
-    error?: { message?: string } | string;
+    error?: { message?: string; code?: string } | string;
+}
+
+export class TranscriptionError extends Error {
+    constructor(message: string, readonly detail: string) {
+        super(message);
+    }
 }
 
 export class LiveTranscriptionSession {
@@ -115,7 +157,11 @@ export class LiveTranscriptionSession {
     private ready = false;
     private closed = false;
     private sentAudio = false;
+    private commitConfirmed = false;
     private commitWaiters: Array<(error?: Error) => void> = [];
+    private capturing = false;
+    private resolveCapturing: (() => void) | null = null;
+    private recording: Float32Array[] = [];
 
     constructor(private readonly handlers: TranscriptionHandlers) {}
 
@@ -139,7 +185,7 @@ export class LiveTranscriptionSession {
 
         await new Promise<void>((resolve, reject) => {
             const timer = window.setTimeout(() => {
-                reject(new Error('Transcription connection timed out'));
+                reject(new TranscriptionError('Could not connect to OpenAI', this.connectTimeoutDetail(timeoutMs)));
             }, timeoutMs);
 
             this.connectWaiters.push((error) => {
@@ -171,7 +217,20 @@ export class LiveTranscriptionSession {
             return;
         }
 
+        const capturing = new Promise<void>((resolve) => {
+            this.resolveCapturing = resolve;
+        });
         await this.startMicPipeline();
+        await capturing;
+    }
+
+    recordedAudio(): Float32Array[] {
+        return this.recording;
+    }
+
+    loadRecording(recording: Float32Array[]): void {
+        this.recording = recording;
+        this.pendingPcm = [...recording];
     }
 
     async connect(
@@ -205,16 +264,18 @@ export class LiveTranscriptionSession {
         });
 
         this.socket.addEventListener('error', () => {
-            this.settleConnect(new Error('Transcription connection failed'));
-            this.settleCommit(new Error('Transcription connection failed'));
             this.handlers.onError('Transcription connection failed');
         });
 
-        this.socket.addEventListener('close', () => {
+        this.socket.addEventListener('close', (event) => {
             this.ready = false;
             this.connected = false;
-            this.settleConnect(new Error('Transcription connection closed'));
-            this.settleCommit(new Error('Transcription connection closed'));
+            const error = new TranscriptionError(
+                'Connection to OpenAI closed',
+                `WebSocket closed with code ${event.code}${event.reason ? `: ${event.reason}` : ''}.`
+            );
+            this.settleConnect(error);
+            this.settleCommit(error);
         });
     }
 
@@ -232,12 +293,12 @@ export class LiveTranscriptionSession {
         }
 
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-            throw new Error('Transcription connection closed');
+            throw this.connectError ?? new TranscriptionError('Connection to OpenAI closed', 'WebSocket was not open when the audio was committed.');
         }
 
         const completed = new Promise<void>((resolve, reject) => {
             const timer = window.setTimeout(() => {
-                this.settleCommit(new Error('Transcription timed out'));
+                this.settleCommit(new TranscriptionError('Transcription timed out', this.commitTimeoutDetail(timeoutMs)));
             }, timeoutMs);
 
             this.commitWaiters.push((error) => {
@@ -261,6 +322,7 @@ export class LiveTranscriptionSession {
         this.connected = false;
         this.settleConnect(new Error('Transcription stopped'));
         this.settleCommit(new Error('Transcription stopped'));
+        this.resolveCapturing?.();
 
         if (this.levelFrame !== 0) {
             cancelAnimationFrame(this.levelFrame);
@@ -276,7 +338,10 @@ export class LiveTranscriptionSession {
         this.sourceNode = null;
         this.analyser = null;
         this.muteNode = null;
-        this.audioContext = null;
+        if (this.audioContext) {
+            dictateAudioGraph.release();
+            this.audioContext = null;
+        }
 
         this.stream?.getTracks().forEach((track) => track.stop());
         this.stream = null;
@@ -304,8 +369,9 @@ export class LiveTranscriptionSession {
             throw new Error('Microphone stream missing');
         }
 
-        const audioContext = await dictateAudioGraph.ensure();
+        const audioContext = await dictateAudioGraph.acquire();
         if (this.closed) {
+            dictateAudioGraph.release();
             return;
         }
 
@@ -322,7 +388,16 @@ export class LiveTranscriptionSession {
             }
 
             const input = event.data as Float32Array;
+            if (!this.capturing) {
+                if (!hasSignal(input)) {
+                    return;
+                }
+                this.capturing = true;
+                this.resolveCapturing?.();
+            }
+
             const resampled = resample(input, audioContext.sampleRate, TARGET_SAMPLE_RATE);
+            this.recording.push(resampled);
             if (!this.ready) {
                 this.pendingPcm.push(resampled);
                 return;
@@ -399,6 +474,27 @@ export class LiveTranscriptionSession {
         }
     }
 
+    private connectTimeoutDetail(timeoutMs: number): string {
+        const seconds = timeoutMs / 1000;
+        if (!this.socket) {
+            return `No OpenAI session key within ${seconds} s.`;
+        }
+
+        if (this.socket.readyState === WebSocket.CONNECTING) {
+            return `The WebSocket to OpenAI did not open within ${seconds} s.`;
+        }
+
+        return `OpenAI did not confirm the transcription session within ${seconds} s.`;
+    }
+
+    private commitTimeoutDetail(timeoutMs: number): string {
+        const samples = this.recording.reduce((total, chunk) => total + chunk.length, 0);
+        const queuedKb = Math.round((this.socket?.bufferedAmount ?? 0) / 1024);
+        return `No transcript from OpenAI within ${timeoutMs / 1000} s after ${(samples / TARGET_SAMPLE_RATE).toFixed(1)} s of audio. `
+            + `OpenAI confirmed receiving the audio: ${this.commitConfirmed ? 'yes' : 'no'}. `
+            + `Upload still queued: ${queuedKb} KB.`;
+    }
+
     private sendPcm(samples: Float32Array): void {
         if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
             return;
@@ -451,10 +547,20 @@ export class LiveTranscriptionSession {
                 }
                 this.settleCommit();
                 break;
+            case 'input_audio_buffer.committed':
+                this.commitConfirmed = true;
+                break;
+            case 'conversation.item.input_audio_transcription.failed':
+                this.settleCommit(new TranscriptionError('OpenAI could not transcribe the audio', realtimeErrorDetail(event.error)));
+                break;
             case 'error': {
-                const message = typeof event.error === 'string' ? event.error : event.error?.message || 'Transcription error';
-                this.settleCommit(new Error(message));
-                this.handlers.onError(message);
+                const detail = realtimeErrorDetail(event.error);
+                const error = new TranscriptionError('OpenAI transcription error', detail);
+                if (!this.connected) {
+                    this.settleConnect(error);
+                }
+                this.settleCommit(error);
+                this.handlers.onError(detail);
                 break;
             }
             default:
@@ -472,6 +578,8 @@ export class MicrophoneCapture {
     private muteNode: GainNode | null = null;
     private levelFrame = 0;
     private closed = false;
+    private capturing = false;
+    private resolveCapturing: (() => void) | null = null;
     private chunks: Float32Array[] = [];
     private sampleRate = 48000;
 
@@ -488,8 +596,9 @@ export class MicrophoneCapture {
         }
 
         this.stream = await navigator.mediaDevices.getUserMedia({ audio });
-        const audioContext = await dictateAudioGraph.ensure();
+        const audioContext = await dictateAudioGraph.acquire();
         if (this.closed) {
+            dictateAudioGraph.release();
             this.stream.getTracks().forEach((track) => track.stop());
             this.stream = null;
             return;
@@ -498,6 +607,9 @@ export class MicrophoneCapture {
         this.audioContext = audioContext;
         this.sampleRate = audioContext.sampleRate;
 
+        const capturing = new Promise<void>((resolve) => {
+            this.resolveCapturing = resolve;
+        });
         const source = audioContext.createMediaStreamSource(this.stream);
         const analyser = audioContext.createAnalyser();
         analyser.fftSize = 512;
@@ -507,7 +619,16 @@ export class MicrophoneCapture {
                 return;
             }
 
-            this.chunks.push(event.data as Float32Array);
+            const input = event.data as Float32Array;
+            if (!this.capturing) {
+                if (!hasSignal(input)) {
+                    return;
+                }
+                this.capturing = true;
+                this.resolveCapturing?.();
+            }
+
+            this.chunks.push(input);
         };
 
         const mute = audioContext.createGain();
@@ -521,6 +642,7 @@ export class MicrophoneCapture {
         this.workletNode = worklet;
         this.muteNode = mute;
         this.pumpLevel();
+        await capturing;
     }
 
     takePcm16(): { pcm: Uint8Array; sampleRate: number } {
@@ -544,6 +666,7 @@ export class MicrophoneCapture {
 
     stop(): void {
         this.closed = true;
+        this.resolveCapturing?.();
         if (this.levelFrame !== 0) {
             cancelAnimationFrame(this.levelFrame);
             this.levelFrame = 0;
@@ -558,7 +681,10 @@ export class MicrophoneCapture {
         this.sourceNode = null;
         this.analyser = null;
         this.muteNode = null;
-        this.audioContext = null;
+        if (this.audioContext) {
+            dictateAudioGraph.release();
+            this.audioContext = null;
+        }
         this.stream?.getTracks().forEach((track) => track.stop());
         this.stream = null;
     }
@@ -579,6 +705,20 @@ export class MicrophoneCapture {
         this.onLevel(Math.min(1, Math.sqrt(sum / data.length) * 4));
         this.levelFrame = requestAnimationFrame(() => this.pumpLevel());
     }
+}
+
+// WebKit feeds exact zeros until the capture device delivers samples; getUserMedia resolves before that.
+function hasSignal(samples: Float32Array): boolean {
+    return samples.some((sample) => sample !== 0);
+}
+
+function realtimeErrorDetail(error: RealtimeEvent['error']): string {
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    const message = error?.message || 'No error message from OpenAI.';
+    return error?.code ? `${message} (${error.code})` : message;
 }
 
 function resample(input: Float32Array, fromRate: number, toRate: number): Float32Array {

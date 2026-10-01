@@ -1,6 +1,7 @@
 <script lang="ts">
     import { emitTo, listen } from '@tauri-apps/api/event';
     import { Window } from '@tauri-apps/api/window';
+    import { error as logError, info } from '@tauri-apps/plugin-log';
     import { onMount, tick } from 'svelte';
     import {
         APP_EVENTS,
@@ -11,7 +12,7 @@
     } from '../../app/events';
     import { cancelAppleDictation, stopAppleDictation } from '../../domain/apple-system';
     import { transcribeLocalStt } from '../../domain/local-stt';
-    import { dictateAudioGraph, LiveTranscriptionSession, MicrophoneCapture } from '../../features/live-transcription';
+    import { dictateAudioGraph, LiveTranscriptionSession, MicrophoneCapture, TranscriptionError } from '../../features/live-transcription';
     import { formatAcceleratorForDisplay } from '../../platform/shortcut';
     import WindowShell from '../../lib/ui/WindowShell.svelte';
 
@@ -34,6 +35,9 @@
     let statusMessage = 'Starting…';
     let errorMessage = '';
     let finishing = false;
+    let openedAt = 0;
+    let retryRecording: Float32Array[] | null = null;
+    let hideGeneration = 0;
 
     $: committedText = committedOrder
         .map((itemId) => committedByItem.get(itemId) ?? '')
@@ -104,6 +108,8 @@
     async function startSession(payload: DictateOpenPayload): Promise<void> {
         stopSession();
         resetTranscript();
+        openedAt = performance.now();
+        retryRecording = null;
         openPayload = payload;
         engine = payload.engine;
         outputMode = payload.outputMode;
@@ -179,6 +185,7 @@
             return;
         }
 
+        void info(`[dictate] ${engine} recording ${Math.round(performance.now() - openedAt)}ms after overlay open`);
         phase = 'recording';
         statusMessage = 'Recording started';
     }
@@ -249,26 +256,59 @@
             return;
         }
 
+        await finishOpenAi();
+    }
+
+    async function finishOpenAi(): Promise<void> {
+        const activeSession = session;
+        const generation = hideGeneration;
         try {
-            if (session && !session.isConnected()) {
-                await session.waitUntilConnected();
+            if (activeSession && !activeSession.isConnected()) {
+                await activeSession.waitUntilConnected();
             }
-            await session?.commitAndWait();
+            await activeSession?.commitAndWait();
         } catch (error) {
+            if (generation !== hideGeneration) {
+                return;
+            }
+
+            const recording = activeSession?.recordedAudio() ?? [];
+            retryRecording = recording.length > 0 ? recording : null;
             stopSession();
             const payload: DictateCommitPayload = {
                 text: '',
-                error: error instanceof Error ? error.message : String(error)
+                error: error instanceof Error ? error.message : String(error),
+                errorDetail: error instanceof TranscriptionError ? error.detail : undefined,
+                retryable: retryRecording !== null
             };
+            void logError(`[dictate] ${payload.error}${payload.errorDetail ? `: ${payload.errorDetail}` : ''}`);
             await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
             return;
         }
 
+        retryRecording = null;
         await tick();
         const text = displayText.trim();
         stopSession();
         const payload: DictateCommitPayload = { text };
         await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
+    }
+
+    async function retryTranscription(): Promise<void> {
+        const recording = retryRecording;
+        if (!recording) {
+            const payload: DictateCommitPayload = { text: '', error: 'The recording is no longer available' };
+            await emitTo('main', APP_EVENTS.DICTATE_COMMIT, payload);
+            return;
+        }
+
+        stopSession();
+        resetTranscript();
+        beginConvert();
+        const replay = createOpenAiSession();
+        replay.loadRecording(recording);
+        session = replay;
+        await finishOpenAi();
     }
 
     async function cancel(): Promise<void> {
@@ -299,9 +339,10 @@
         let unlistenHide: (() => void) | undefined;
         let unlistenLatch: (() => void) | undefined;
         let unlistenFinish: (() => void) | undefined;
+        let unlistenRetry: (() => void) | undefined;
         let unlistenCloseRequested: (() => void) | undefined;
 
-        void dictateAudioGraph.ensure().catch((error) => {
+        void dictateAudioGraph.prewarm().catch((error) => {
             console.warn('Could not prewarm dictate audio graph:', error);
         });
 
@@ -320,6 +361,7 @@
                 }
             });
             unlistenHide = await currentWindow.listen(APP_EVENTS.DICTATE_HIDE, () => {
+                hideGeneration += 1;
                 stopSession();
             });
             unlistenLatch = await currentWindow.listen(APP_EVENTS.DICTATE_LATCH, () => {
@@ -330,6 +372,9 @@
             });
             unlistenFinish = await currentWindow.listen(APP_EVENTS.DICTATE_FINISH, () => {
                 void commit();
+            });
+            unlistenRetry = await currentWindow.listen(APP_EVENTS.DICTATE_RETRY, () => {
+                void retryTranscription();
             });
             unlistenCloseRequested = await currentWindow.onCloseRequested(async (event) => {
                 event.preventDefault();
@@ -349,6 +394,7 @@
             unlistenHide?.();
             unlistenLatch?.();
             unlistenFinish?.();
+            unlistenRetry?.();
             unlistenCloseRequested?.();
             window.removeEventListener('keydown', handleWindowKeydown);
             stopSession();

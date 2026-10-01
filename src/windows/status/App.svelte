@@ -25,6 +25,7 @@
     let isVisible = false;
     let hideTimeout: number | null = null;
     let actionSent = false;
+    let detailOpen = false;
     let elapsedSeconds = 0;
     let elapsedStartedAt = 0;
     let elapsedInterval: number | null = null;
@@ -33,7 +34,10 @@
     $: hasActions = (currentPayload.actions?.length ?? 0) > 0;
     $: isWorking = currentPayload.type === 'working';
     $: isCancellable = Boolean(currentPayload.cancellable);
-    $: showRetry = isCancellable && elapsedSeconds * 1000 >= RETRY_VISIBLE_AFTER_MS;
+    $: isRetryable = Boolean(currentPayload.retryable);
+    $: hasDetail = Boolean(currentPayload.detail);
+    $: hasControls = isCancellable || isRetryable || hasDetail;
+    $: showRetry = isRetryable || (isCancellable && elapsedSeconds * 1000 >= RETRY_VISIBLE_AFTER_MS);
     $: toastTitle = isWorking ? 'Currently improving' : undefined;
 
     async function display(payload: StatusDisplayPayload): Promise<void> {
@@ -43,6 +47,7 @@
         }
 
         actionSent = false;
+        detailOpen = false;
         currentPayload = {
             autohide: true,
             allowHtml: false,
@@ -123,13 +128,31 @@
     }
 
     async function handleCancel(): Promise<void> {
-        await emitTo('main', APP_EVENTS.STATUS_ACTION, { action: 'cancel' });
+        if (isCancellable) {
+            await emitTo('main', APP_EVENTS.STATUS_ACTION, { action: 'cancel' });
+        }
         await hide();
     }
 
     async function handleRetry(): Promise<void> {
         await emitTo('main', APP_EVENTS.STATUS_ACTION, { action: 'retry' });
+        if (isRetryable) {
+            await hide();
+            return;
+        }
+
         startElapsed();
+        await tick();
+        await resizeWindow();
+    }
+
+    async function toggleDetail(): Promise<void> {
+        detailOpen = !detailOpen;
+        if (hideTimeout !== null) {
+            window.clearTimeout(hideTimeout);
+            hideTimeout = null;
+        }
+
         await tick();
         await resizeWindow();
     }
@@ -146,7 +169,7 @@
         }
 
         const rect = toastElement.getBoundingClientRect();
-        const maxHeight = hasActions ? 360 : 204;
+        const maxHeight = hasActions || detailOpen ? 360 : 204;
         const statusWindow = Window.getCurrent();
         await statusWindow.setSize(
             new LogicalSize(
@@ -206,8 +229,25 @@
             {#if isWorking}
                 <span class="status-toast__elapsed">{elapsedSeconds}s</span>
             {/if}
-            {#if isCancellable}
+            {#if hasControls}
                 <div class="status-toast__controls">
+                    {#if hasDetail}
+                        <button
+                            type="button"
+                            class="status-toast__icon-btn"
+                            title="Details"
+                            aria-label="Details"
+                            aria-expanded={detailOpen}
+                            on:click={() => void toggleDetail()}
+                        >
+                            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+                                <path
+                                    fill="currentColor"
+                                    d="M8 1.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13zM0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8zm8-3.25a.9.9 0 1 1 0-1.8.9.9 0 0 1 0 1.8zM7.25 6.5h1.5v5.5h-1.5z"
+                                />
+                            </svg>
+                        </button>
+                    {/if}
                     {#if showRetry}
                         <button
                             type="button"
@@ -227,8 +267,8 @@
                     <button
                         type="button"
                         class="status-toast__icon-btn"
-                        title="Cancel"
-                        aria-label="Cancel"
+                        title={isCancellable ? 'Cancel' : 'Close'}
+                        aria-label={isCancellable ? 'Cancel' : 'Close'}
                         on:click={() => void handleCancel()}
                     >
                         <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
@@ -248,6 +288,9 @@
                 {currentPayload.message}
             {/if}
         </div>
+        {#if detailOpen && currentPayload.detail}
+            <pre class="status-toast__detail">{currentPayload.detail}</pre>
+        {/if}
         {#if currentPayload.pairs && currentPayload.pairs.length > 0}
             <ul class="status-toast__pairs">
                 {#each currentPayload.pairs as pair}

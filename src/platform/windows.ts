@@ -212,6 +212,12 @@ export class AppWindows {
         await this.revealWindow(dictateWindow, { focus: false, promoteToFront: true });
     }
 
+    async retryDictate(): Promise<void> {
+        const dictateWindow = await this.ensureWindow('dictate');
+        await dictateWindow.emit(APP_EVENTS.DICTATE_RETRY);
+        await this.revealWindow(dictateWindow, { focus: false, promoteToFront: true });
+    }
+
     async provideDictateSession(clientSecret: string): Promise<void> {
         const dictateWindow = this.registry.get('dictate')?.window;
         if (!dictateWindow) {

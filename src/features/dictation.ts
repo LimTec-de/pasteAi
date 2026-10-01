@@ -36,6 +36,7 @@ export class DictationController {
     private starting: Promise<void> | null = null;
     private pendingImprove: PendingDictateImprove | null = null;
     private improveGeneration = 0;
+    private transcriptionRetryAvailable = false;
 
     constructor(
         private readonly settingsRepository: SettingsRepository,
@@ -53,7 +54,7 @@ export class DictationController {
             void this.handleCancel();
         });
         await listen<StatusActionPayload>(APP_EVENTS.STATUS_ACTION, (event) => {
-            void this.handleImproveStatusAction(event.payload.action);
+            void this.handleStatusAction(event.payload.action);
         });
         await this.registerFromSettings();
         await this.preloadLocalIfNeeded();
@@ -138,6 +139,7 @@ export class DictationController {
 
         this.holdIntent = true;
         this.cancelled = false;
+        this.transcriptionRetryAvailable = false;
         this.pressAt = Date.now();
         this.starting = this.beginSession();
         void this.starting;
@@ -335,11 +337,16 @@ export class DictationController {
         await this.windows.hideDictate();
 
         if (payload.error) {
+            this.transcriptionRetryAvailable = Boolean(payload.retryable);
             this.clipboardImprover.endDictation();
             await invoke('restore_frontmost_app').catch((error) => {
                 console.warn('Could not restore frontmost app:', error);
             });
-            await this.showStatus(payload.error, 'error');
+            await this.showStatus(payload.error, 'error', {
+                autohide: !payload.retryable,
+                detail: payload.errorDetail,
+                retryable: payload.retryable
+            });
             return;
         }
 
@@ -410,14 +417,43 @@ export class DictationController {
         }
     }
 
-    private async handleImproveStatusAction(action: StatusActionPayload['action']): Promise<void> {
+    private async handleStatusAction(action: StatusActionPayload['action']): Promise<void> {
         if (action === 'cancel') {
             await this.cancelImprove();
             return;
         }
 
         if (action === 'retry') {
-            await this.retryImprove();
+            if (this.pendingImprove) {
+                await this.retryImprove();
+            } else {
+                await this.retryTranscription();
+            }
+        }
+    }
+
+    private async retryTranscription(): Promise<void> {
+        if (!this.transcriptionRetryAvailable || this.holdIntent || this.clipboardImprover.isBusy()) {
+            return;
+        }
+
+        this.transcriptionRetryAvailable = false;
+        this.clipboardImprover.beginDictation();
+        const mint = this.providerGateway.createTranscriptionClientSecret();
+        await this.windows.retryDictate();
+        await invoke('restore_frontmost_app').catch((error) => {
+            console.warn('Could not restore frontmost app:', error);
+        });
+
+        try {
+            await this.windows.provideDictateSession(await mint);
+        } catch (error) {
+            await this.handleCommit({
+                text: '',
+                error: 'Could not start transcription',
+                errorDetail: error instanceof Error ? error.message : String(error),
+                retryable: true
+            });
         }
     }
 
@@ -535,14 +571,16 @@ export class DictationController {
     private async showStatus(
         message: string,
         type: StatusType,
-        options: { autohide?: boolean; allowHtml?: boolean; cancellable?: boolean } = {}
+        options: { autohide?: boolean; allowHtml?: boolean; cancellable?: boolean; detail?: string; retryable?: boolean } = {}
     ): Promise<void> {
         await this.windows.showStatus({
             message,
             type,
             autohide: options.autohide,
             allowHtml: options.allowHtml,
-            cancellable: options.cancellable
+            cancellable: options.cancellable,
+            detail: options.detail,
+            retryable: options.retryable
         });
     }
 }

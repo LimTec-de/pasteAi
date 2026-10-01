@@ -141,6 +141,8 @@ export interface StatusDisplayPayload {
     autohide?: boolean;
     allowHtml?: boolean;
     cancellable?: boolean;
+    detail?: string;
+    retryable?: boolean;
     pairs?: DictionaryLearnPair[];
     actions?: StatusAction[];
 }
