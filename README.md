@@ -9,14 +9,14 @@ You can also dictate: hold the shortcut (default ⌘⇧Space / Ctrl+Shift+Space)
 
 ## Download
 
-**v0.14.15**
+**v0.14.16**
 
-[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.15/pasteai_0.14.15_aarch64.dmg)
-[![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.15/pasteai_0.14.15_x64.dmg)
-[![Windows](https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.15/pasteai_0.14.15_x64-setup.exe)
-[![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.15/pasteai_0.14.15_amd64.AppImage)
-[![Debian](https://img.shields.io/badge/Debian-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.15/pasteai_0.14.15_amd64.deb)
-[![RPM](https://img.shields.io/badge/RPM-294172?style=for-the-badge&logo=redhat&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.15/pasteai-0.14.15-1.x86_64.rpm)
+[![macOS Apple Silicon](https://img.shields.io/badge/macOS-Apple_Silicon-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.16/pasteai_0.14.16_aarch64.dmg)
+[![macOS Intel](https://img.shields.io/badge/macOS-Intel-000000?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.16/pasteai_0.14.16_x64.dmg)
+[![Windows](https://img.shields.io/badge/Windows-0078D4?style=for-the-badge&logo=windows&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.16/pasteai_0.14.16_x64-setup.exe)
+[![Linux](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.16/pasteai_0.14.16_amd64.AppImage)
+[![Debian](https://img.shields.io/badge/Debian-A81D33?style=for-the-badge&logo=debian&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.16/pasteai_0.14.16_amd64.deb)
+[![RPM](https://img.shields.io/badge/RPM-294172?style=for-the-badge&logo=redhat&logoColor=white)](https://github.com/LimTec-de/pasteAi/releases/download/pasteAI-v0.14.16/pasteai-0.14.16-1.x86_64.rpm)
 
 ⚠️ You can use some free tokens from our server. After this, buy more at [pasteai.app](https://pasteai.app), paste your own [OpenAI API key](https://platform.openai.com/api-keys) in Settings (Tray Menu), or switch to Apple Intelligence / a local model.
 
