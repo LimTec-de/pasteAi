@@ -8,6 +8,7 @@
 - `frontmost.rs`: remember macOS pid / Windows HWND / Linux X11 `_NET_ACTIVE_WINDOW`; paste restores then Cmd/Ctrl+V. macOS AX prompt only when paste needs it. Prompt picker: remember, `activate_this_app`, hide, restore. Windows AttachThreadInput. Wayland remember/restore no-op.
 
 ## Dictation settings
+- `SettingsRepository` migrates legacy keys once per `initialize`/`reload`, never per `get`. Per-get migration made `getAll()` ~490 serial store IPCs before the overlay showed: seconds under CPU load (`src/domain/settings-repository.ts`).
 - `dictateLanguages` (active ISO-639-1, default de+en) + `dictateDownloadedLanguages` (superset). Legacy `dictateLanguage` `auto`→both; `de`/`en`→that code. Last active cannot turn off. Cap `AssetInventory.maximumReservedLocales`. Empty `dictateMicrophoneId`=default. Apple mic: CoreAudio UID on input-only `AVAudioEngine`, never HAL default input.
 
 ## Post-dictation prompt

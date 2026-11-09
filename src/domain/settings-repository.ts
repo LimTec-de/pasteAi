@@ -59,14 +59,20 @@ const LEGACY_SETTINGS_KEYS: Partial<Record<keyof AppSettings, string>> = {
 };
 
 export class SettingsRepository {
+    private initializationPromise: Promise<void> | null = null;
+
     constructor(private readonly store: AppStore) {}
 
     async initialize(): Promise<void> {
-        await this.store.initialize();
-        await this.migrateLegacySettings();
+        if (!this.initializationPromise) {
+            this.initializationPromise = this.store.initialize().then(() => this.migrateLegacySettings());
+        }
+
+        await this.initializationPromise;
     }
 
     async reload(): Promise<void> {
+        await this.initialize();
         await this.store.reload();
         await this.migrateLegacySettings();
     }
