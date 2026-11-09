@@ -13,11 +13,11 @@
 ## macOS Accessibility for paste — 2026-08-27
 - Cmd+V via `CGEvent` + `kCGHIDEventTap` needs Accessibility, not Input Monitoring. Accessory policy hides TCC dialogs; prompt on main thread after `Regular` + `NSApplication.activate`. Tahoe: `x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_Accessibility`
 
-## TypeScript 7 vs svelte-check — 2026-08-27
-- svelte-check 4.7.6 crashes on TypeScript 7 (`typescript.default.sys` undefined). Stay on `^6.0.3`. https://github.com/sveltejs/language-tools/issues/3063
+## TypeScript 7 vs svelte-check — 2026-11-09
+- svelte-check 4.7.8 peers `typescript ^5 || ^6` and still has no stable programmatic API for TypeScript 7 (`typescript` 7 as the compiler crashes; `--tsgo` needs both 6 and 7). Stay on `^6.0.3`. https://github.com/sveltejs/language-tools/issues/3063
 
-## pnpm 12 vs 11 — 2026-08-27
-- pnpm 12 is stable but npm `latest` is still 11. Stay on 11.24.0. https://pnpm.io/installation
+## pnpm — 2026-11-09
+- npm `latest` is 12.18.0. `packageManager` is that pin. Default `minimumReleaseAge` is 1440 minutes. https://pnpm.io/migration-v11
 
 ## Apple Foundation Models — 2026-08-27
 - `SystemLanguageModel.default` + `LanguageModelSession`. First `respond` loads the model; `prewarm()` is the documented way to hide that. Context 4096. English `Instructions` + other-language prompt may translate; pasteAI uses `You MUST write the edited text in <English name>.` https://developer.apple.com/documentation/foundationmodels
@@ -30,19 +30,19 @@
 ## OpenAI STT dictionary — 2026-08-28
 - `keywords` = spoken terms, not replacement output (don’t send emails). `prompt` = recording context, not a restatement of the task. https://developers.openai.com/api/docs/guides/transcription#improve-transcription-quality
 
-## sherpa-onnx + Parakeet TDT v3 — 2026-08-28
-- Crate 1.13.6 still links Static. Windows archive is `/MT`; llama-cpp-2 is `/MD` → `LNK2038`. Override with official `*-static-MD-Release-lib` via `SHERPA_ONNX_LIB_DIR`. https://github.com/k2-fsa/sherpa-onnx/releases/tag/v1.13.6
+## sherpa-onnx + Parakeet TDT v3 — 2026-11-09
+- Crate 2.0.1 still links static. Windows prebuilt is `/MT`; llama-cpp-2 is `/MD` → `LNK2038`. Override with official `*-static-MD-Release-lib` via `SHERPA_ONNX_LIB_DIR`. https://github.com/k2-fsa/sherpa-onnx/releases/tag/v2.0.1
 - Model: `sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8`. 16 kHz. `provider=Some("cpu")`. Leftover `.tar.bz2` = extract unfinished. Truncated encoder → uncaught `Ort::Exception`.
 
-## llama-cpp-2 + Qwen3-4B GGUF — 2026-08-30
-- 0.1.154 `features = ["common"]`. Default `n_gpu_layers=-1`; if `!supports_gpu_offload()` use `with_n_gpu_layers(0)`. `LlamaBackend::void_logs()` or every `new_context` dumps Metal INFO. Context not thread-safe → `spawn_blocking` + Mutex. `AddBos::Never`. https://docs.rs/llama-cpp-2/0.1.154/llama_cpp_2/
+## llama-cpp-2 + Qwen3-4B GGUF — 2026-11-09
+- 0.1.161 `features = ["common"]`. Default `n_gpu_layers=-1`; if `!supports_gpu_offload()` use `with_n_gpu_layers(0)`. `LlamaBackend::void_logs()` or every `new_context` dumps Metal INFO. Context not thread-safe → `spawn_blocking` + Mutex. Tokenize with `model.vocab().tokenize(bytes, false, true)` (`add_special` false, `parse_special` true). `AddBos` / `str_to_token` are gone. https://docs.rs/llama-cpp-2/0.1.161/llama_cpp_2/
 - File `Qwen3-4B-Instruct-2507-Q4_K_M.gguf` 2497281120 bytes SHA256 `3605803b982cb64aead44f6c1b2ae36e3acdb41d8e46c8a94c6533bc4c67e597`.
 
 ## OpenAI rewrite models — 2026-09-01
 - `gpt-5.6-luna` default `reasoning.effort=medium`; for short rewrite set `reasoning_effort: "none"` or first token is much slower. https://developers.openai.com/api/docs/models/gpt-5.6-luna
 
-## WKWebView background throttling (Tauri 2.11 / wry 0.55) — 2026-09-24
-- A web view not in a visible window defaults to `WKPreferences.inactiveSchedulingPolicy = suspend`: JS and IPC replies pause until something wakes the page. Tauri window config `backgroundThrottling: "disabled"` → wry sets `.none` (macOS 14+ only; ignored on Linux/Windows). Source: `tauri-utils-2.9.3/src/config.rs` `background_throttling`, `wry-0.55.1/src/wkwebview/mod.rs` L473–495. https://developer.apple.com/documentation/webkit/wkpreferences/inactiveschedulingpolicy
+## WKWebView background throttling (Tauri 2.12 / wry 0.57) — 2026-11-09
+- A web view not in a visible window defaults to `WKPreferences.inactiveSchedulingPolicy = suspend`: JS and IPC replies pause until something wakes the page. Tauri window config `backgroundThrottling: "disabled"` → wry sets `.none` (macOS 14+ only; ignored on Linux/Windows). Source: `tauri-utils-2.10.2/src/config.rs` `background_throttling`, `wry-0.57.1/src/wkwebview/mod.rs` L515–536. https://developer.apple.com/documentation/webkit/wkpreferences/inactiveschedulingpolicy
 - A running `AudioContext` (silent graph) in a hidden, suspended page keeps the output device on: `pmset -g assertions` shows coreaudiod `PreventUserIdleSystemSleep … audio-out BuiltInSpeakerDevice` for the app's WebKit GPU process (~0.8% CPU) while the web process is idle. `suspend()` releases it. Verified 2026-10-01, macOS 27.
 - `getUserMedia` resolves before the mic delivers audio; the source node outputs exact zeros until then. MacBook Pro mic with `echoCancellation`: first non-zero frame ~1.5 s after overlay open. Gating on `getUserMedia` lost the first ~3 spoken numbers. Verified 2026-10-01.
 - Keep `echoCancellation: true`. Off: mic start 0.25–1 s, but with music from the speakers dictation failed. Switching it on CoreAudio `kAudioDevicePropertyDeviceIsRunningSomewhere` doesn't pay off: a paused VLC keeps its output device running, and sound that starts mid-dictation goes unseen. Verified 2026-10-01.

@@ -10,7 +10,7 @@ use llama_cpp_2::context::params::LlamaContextParams;
 use llama_cpp_2::llama_backend::LlamaBackend;
 use llama_cpp_2::llama_batch::LlamaBatch;
 use llama_cpp_2::model::params::LlamaModelParams;
-use llama_cpp_2::model::{AddBos, LlamaChatMessage, LlamaChatTemplate, LlamaModel};
+use llama_cpp_2::model::{LlamaChatMessage, LlamaChatTemplate, LlamaModel};
 use llama_cpp_2::sampling::LlamaSampler;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -308,9 +308,8 @@ fn generate(model: &LlamaModel, system_prompt: &str, text: &str) -> Result<Strin
         .apply_chat_template(&template, &messages, true)
         .map_err(|error| error.to_string())?;
 
-    let tokens = model
-        .str_to_token(&prompt, AddBos::Never)
-        .map_err(|error| error.to_string())?;
+    let vocab = model.vocab();
+    let tokens = vocab.tokenize(prompt.as_bytes(), false, true);
     if tokens.is_empty() {
         return Ok(String::new());
     }
@@ -340,15 +339,15 @@ fn generate(model: &LlamaModel, system_prompt: &str, text: &str) -> Result<Strin
     while n_cur < n_limit {
         let token = sampler.sample(&ctx, batch.n_tokens() - 1);
         sampler.accept(token);
-        if model.is_eog_token(token) {
+        if vocab.is_eog(token) {
             break;
         }
 
-        output.push_str(
-            &model
-                .token_to_piece(token, &mut decoder, true, None)
-                .map_err(|error| error.to_string())?,
-        );
+        let mut piece = Vec::new();
+        vocab.token_to_piece_into(token, &mut piece, true, None);
+        let mut piece_text = String::new();
+        let (_result, _read, _errors) = decoder.decode_to_string(&piece, &mut piece_text, false);
+        output.push_str(&piece_text);
 
         batch.clear();
         batch
@@ -405,7 +404,11 @@ fn sha256_file(path: &Path) -> Result<String, String> {
         }
         hasher.update(&buffer[..read]);
     }
-    Ok(format!("{:x}", hasher.finalize()))
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect())
 }
 
 fn snapshot(app: &AppHandle, state: &LocalLlmState) -> Result<LocalLlmStatus, String> {

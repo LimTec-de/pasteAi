@@ -37,4 +37,4 @@
 - `askEveryTime` independent of `defaultPromptId`. Full list: click/arrows select only; Enter or Continue confirms (click must not submit). Always prewarm prompt window. Extra via `composeImprovePrompt`. Dictation / `pasteai:` prefix unchanged.
 
 ## Deps / CI
-- `typescript` `^6.0.3`. `overrides.valibot: 1.4.2`. Windows crate `0.62`. CI: `pnpm/setup@v2` node 24, `tauri-action@v1` `uploadUpdaterJson`, Windows `LIBCLANG_PATH` + sherpa-md script.
+- `typescript` `^6.0.3`. `overrides.valibot: 1.5.0`. Windows crate `0.62`. CI: `pnpm/setup@v2` node 24, `tauri-action@v1` `uploadUpdaterJson`, Windows `LIBCLANG_PATH` + sherpa-md script.

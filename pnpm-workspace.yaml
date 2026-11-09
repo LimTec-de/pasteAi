@@ -5,4 +5,4 @@ allowBuilds:
   esbuild: true
 
 overrides:
-  valibot: 1.4.2
+  valibot: 1.5.0
